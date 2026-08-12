@@ -72,7 +72,7 @@ export default function NewsResearchWorkbench() {
   const [feed, setFeed] = useState<NewsResearchResponse | null>(null);
   const [categorySelection, setCategorySelection] =
     useState<CategorySelection>("all");
-  const [windowHours, setWindowHours] = useState(24);
+  const [windowHours, setWindowHours] = useState(3);
   const [maxResults, setMaxResults] = useState(20);
   const [customSeedText, setCustomSeedText] = useState("");
   const [prompt, setPrompt] = useState(DEFAULT_NEWS_RESEARCH_PROMPT);
@@ -357,7 +357,7 @@ export default function NewsResearchWorkbench() {
           <label>
             <span>최근 뉴스 범위</span>
             <select value={windowHours} onChange={(event) => setWindowHours(Number(event.target.value))}>
-              <option value={3}>최근 3시간</option>
+              <option value={3}>최근 3시간 (기본)</option>
               <option value={6}>최근 6시간</option>
               <option value={12}>최근 12시간</option>
               <option value={24}>최근 24시간</option>
