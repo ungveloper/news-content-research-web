@@ -468,7 +468,7 @@ export async function collectNewsOpportunities(input: {
 }): Promise<NewsResearchResponse> {
   const now = Date.now();
   const seeds = buildSeeds(input.categorySelection, input.customSeeds);
-  const windowHours = clamp(Math.round(input.windowHours), 3, 48);
+  const windowHours = clamp(input.windowHours, 0.5, 48);
   const cutoff = now - windowHours * 60 * 60 * 1000;
   const warnings: string[] = [];
   let successfulSeedCount = 0;

@@ -237,6 +237,11 @@ function formatPercent(value: number | null): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
+function formatWindowRange(windowHours: number): string {
+  if (windowHours < 1) return `${Math.round(windowHours * 60)}분`;
+  return `${windowHours}시간`;
+}
+
 function formatCategoryPolicy(selection: CategorySelection): string {
   if (selection === "all") {
     return [
@@ -348,7 +353,7 @@ export function buildNewsResearchPackage(input: {
     `- NAVER API 모드: ${feed.summary.apiMode === "hub" ? "API HUB" : "기존 Developer API fallback"}`,
     `- 뉴스 검색 시드: ${feed.summary.successfulSeedCount}/${feed.summary.requestedSeedCount} 성공, ${feed.summary.failedSeedCount} 실패`,
     `- 원본 뉴스 응답: ${feed.summary.rawArticleCount}건`,
-    `- 최근 ${feed.summary.windowHours}시간 유효 뉴스: ${feed.summary.recentArticleCount}건`,
+    `- 최근 ${formatWindowRange(feed.summary.windowHours)} 유효 뉴스: ${feed.summary.recentArticleCount}건`,
     `- 사건 군집: ${feed.summary.clusterCount}개`,
     `- Search Trend 검증 성공 후보: ${feed.summary.trendValidatedCount}/${feed.opportunities.length}`,
     `- Naver 블로그 경쟁 사전검증 성공 후보: ${feed.summary.competitionValidatedCount}/${feed.opportunities.length}`,
