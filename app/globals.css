@@ -375,7 +375,8 @@ input:focus, select:focus, textarea:focus { border-color: #6f98d9; box-shadow: 0
   .hero { padding: 34px 22px; border-radius: 20px; }
   .hero h1 br { display: none; }
   .panel { padding: 20px 16px; border-radius: 16px; }
-  .category-grid, .control-grid, .summary-grid, .signal-grid { grid-template-columns: 1fr; }
+  .category-grid, .control-grid, .signal-grid { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .category-card:first-child, .seed-input, .collect-button { grid-column: auto; }
   .opportunity-card__top { grid-template-columns: 34px minmax(0, 1fr); }
   .score-box { grid-column: 2; text-align: left; }
