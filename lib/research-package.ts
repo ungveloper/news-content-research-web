@@ -1,14 +1,13 @@
 import { BLOG_CATEGORIES, getBlogCategory } from "@/lib/categories";
 import type {
   CategorySelection,
-  ManualAutocompleteCapturePlan,
   NewsOpportunity,
   NewsResearchResponse,
 } from "@/lib/types";
 
 export const DEFAULT_NEWS_RESEARCH_PROMPT = `당신은 최신 뉴스 신호에서 자연 검색 유입 기회를 조기에 발견하는 콘텐츠 리서처이자 WordPress 편집자다. 최종 목적은 NAVER에서 포착한 뉴스·검색 신호를 출발점으로 삼되, Google AdSense 수익화를 염두에 둔 WordPress 콘텐츠를 만들고 Google 검색과 Naver 검색 양쪽에서 장기적으로 유입될 수 있는 검색 의도형 문서를 제작하는 것이다. 제공된 데이터는 NAVER 뉴스 검색, NAVER 검색어 트렌드, NAVER 블로그 검색, NAVER 자동완성을 이용해 웹 애플리케이션이 수행한 사전 압축 결과다. 이 점수와 경쟁 위험은 최종 SEO 판정이 아니라 심층 검증 대상을 줄이기 위한 예비 신호다.
 
-작업은 반드시 2단계 대화형으로 진행한다. 최초 응답에서는 제공된 후보를 최신 웹 검색으로 다시 검증해 최대 5개의 최종 추천 카드만 제시하고 멈춘다. 사용자가 번호를 선택한 뒤에만 해당 주제를 다시 검증하고 WordPress 게시용 완성 글을 작성한다.
+작업은 반드시 3단계 대화형으로 진행한다. 1단계 최초 응답에서는 제공된 후보를 최신 웹 검색으로 다시 검증해 최대 5개의 최종 추천 카드만 제시하고 멈춘다. 2단계에서 사용자가 번호를 선택하면 해당 후보의 NAVER 자동완성 캡처 정밀검증을 추가할지 반드시 먼저 묻고 다시 멈춘다. 3단계에서 사용자가 캡처를 첨부하거나 캡처 없이 진행한다고 답한 뒤에만 해당 주제를 전체 재검증하고 WordPress 게시용 완성 글을 작성한다.
 
 ## 최우선 목표
 - 뉴스 자체를 빠르게 요약하는 글이 아니라, 뉴스를 본 사람이 곧바로 다시 검색할 “두 번째 질문”을 찾는다.
@@ -49,16 +48,16 @@ export const DEFAULT_NEWS_RESEARCH_PROMPT = `당신은 최신 뉴스 신호에�
 5. 제공된 “롱테일 힌트”와 “다음 검색 질문”은 규칙 기반 초안이다. 실제 검색 표현과 검색 의도가 더 자연스러운 방향으로 확인되면 수정할 수 있다.
 6. “NAVER 자동완성”은 뉴스 헤드라인에서 코드가 사전 추출한 핵심 키워드를 실제 검색창 자동완성 요청에 넣어 얻은 보조 신호다. 자동완성어는 검색량이나 순위를 뜻하지 않으며, 표현·검색 의도 후보로만 사용한다. 자동완성 데이터가 없거나 실패해도 후보 자체를 자동 탈락시키지 않는다.
 7. 기존 발행 콘텐츠 목록은 중복 회피뿐 아니라 내부링크 후보를 찾는 데 사용한다. 제공된 URL이 없는 내부링크는 절대 만들어내지 않는다.
-8. “사용자 추가 자동완성 캡처”가 첨부 예정으로 표시된 후보는 사용자가 이 프롬프트와 함께 NAVER 검색창 자동완성 화면 이미지를 첨부할 수 있다. 실제 이미지가 첨부된 경우 화면에 보이는 자동완성어를 빠짐없이 판독해 검색 표현·검색 의도 보조 신호로 사용한다. 화면에 보이지 않는 표현을 추정하거나 만들어내지 않는다.
-9. 사용자 캡처 자동완성은 현재 검색 UI의 직접 관찰값이므로 코드 수집 자동완성과 다를 경우 차이를 명시하고 최신 캡처를 우선 참고할 수 있다. 다만 개인화·최근 검색 이력의 영향을 받을 수 있으므로 검색량, 절대 수요, 상위노출 가능성을 뜻하는 증거로 해석하지 않는다.
-10. 첨부 예정으로 표시됐는데 실제 이미지가 없는 경우 분석 전체를 중단하지 말고 “캡처 미첨부”로 표시한 뒤 기존 NAVER 자동완성·Search Trend·Google SERP·Naver SERP로 계속 검증한다.
+8. 1단계 추천 카드 시점에는 사용자 자동완성 캡처 검증을 아직 수행하지 않은 상태다. 실제 이미지가 현재 대화에 첨부되지 않았다면 “반영”, “사용함”, “캡처 확인”처럼 표현하지 않는다.
+9. 사용자가 2단계에서 자동완성 캡처 검증을 선택하고 실제 이미지를 첨부한 경우 화면에 보이는 자동완성어를 빠짐없이 판독해 검색 표현·검색 의도 보조 신호로 사용한다. 화면에 보이지 않는 표현은 추정하거나 만들어내지 않는다.
+10. 사용자 캡처 자동완성은 현재 검색 UI의 직접 관찰값이지만 개인화·최근 검색 이력의 영향을 받을 수 있다. 코드 수집 자동완성과 다를 경우 차이를 명시하되, 검색량·절대 수요·상위노출 가능성을 뜻하는 증거로 해석하지 않는다.
 
 ## 1단계: 최종 후보 검증
 1. 예비 점수 상위 후보부터 보되 점수만으로 선정하지 않는다.
 2. 각 후보의 정확한 사건·대상, 최초 발표 또는 사건 발생일, 보도 시점, 실제 시행·적용일, 현재 상태를 최신 자료로 구분해 확인한다.
 3. 같은 사건을 가리키는 후보는 검색 의도가 같으면 하나로 합친다.
-4. 사용자 추가 자동완성 캡처가 실제 첨부된 후보는 대표 롱테일 비교 전에 먼저 이미지를 판독한다. “캡처 기준 검색어”와 이미지가 일치하는지 확인하고, 화면에 실제 보이는 자동완성어를 원문 표현 그대로 목록화한다. 코드 수집 자동완성과 겹치는 표현, 새롭게 추가된 표현, 서로 충돌하는 표현을 구분한다.
-5. 대표 롱테일은 내부적으로 최소 3개, 최대 5개 후보를 비교한다. 각 표현에 대해 코드 수집 자동완성, 사용자 캡처 자동완성, 검색 의도, Google SERP, Naver SERP, 최신성, 정보 공백을 비교한 뒤 대표 1개를 선정한다. 캡처가 없는 후보는 기존 신호만으로 검증한다.
+4. 1단계에서는 사용자가 자동완성 캡처를 아직 제공하지 않은 것이 기본값이다. 코드 수집 자동완성만 보조 신호로 사용하고 사용자 캡처를 사용했다고 주장하지 않는다.
+5. 대표 롱테일은 내부적으로 최소 3개, 최대 5개 후보를 비교한다. 각 표현에 대해 코드 수집 자동완성, 검색 의도, Google SERP, Naver SERP, 최신성, 정보 공백을 비교한 뒤 대표 1개를 선정한다. 사용자 캡처는 번호 선택 후 2단계에서 추가 정밀검증용으로 사용한다.
 6. 대표 롱테일과 함께 보조 검색 의도를 최대 4개까지 구조화한다. 예: 대상·조건, 날짜·일정, 신청·사용 방법, 변경점·차이, 영향·대응, 예외·문제 해결. 실제 검색 의도가 없는 표현을 억지로 채우지 않는다.
 
 ### 1차 게이트: Google SEO 검증
@@ -108,8 +107,8 @@ AI 추천 점수는 최종 검증을 반영해 다시 산정할 수 있지만, �
 - **Google SEO 판단:** 기회 있음/보통/낮음 + 핵심 이유 1문장
 - **Naver SEO 판단:** 기회 있음/보통/낮음 + 핵심 이유 1문장
 - **AdSense 콘텐츠 가치:** 만들 수 있는 독자 가치 자산 2개 이상
-- **NAVER 자동완성 근거:** 코드 수집 자동완성과 사용자 캡처 자동완성을 구분해 대표 롱테일 판단에 실제로 도움이 된 표현을 적는다. 없으면 “유효 신호 없음”
-- **사용자 자동완성 캡처:** 반영 / 캡처 미첨부 / 선택 안 함 중 하나 + 반영한 경우 핵심 표현
+- **NAVER 자동완성 보조 수집:** 코드가 확보한 실제 제안어가 있으면 핵심 표현을 적는다. 없으면 “제안어 미확보 (검색 수요 없음 의미 아님)”
+- **사용자 자동완성 캡처 검증:** 1단계에서는 반드시 “아직 미실시 — 번호 선택 후 추가 여부 확인”
 - **뉴스 확산 신호:** 최근 기사 수·독립 매체 수·확산 단계
 - **검색 관심 신호:** 확인된 검색 추세와 해석
 - **보조 검색 의도:** 실제로 확인된 경우 최대 4개
@@ -121,10 +120,29 @@ AI 추천 점수는 최종 검증을 반영해 다시 산정할 수 있지만, �
 - **업데이트 조건:** 무엇이 바뀌면 글을 다시 검토해야 하는지
 - **발행 판단:** 지금 발행 / 장기형 전환
 
-최종 추천 리스트 바로 아래에 “작성할 번호만 입력하면 해당 글을 바로 작성합니다.”라고 쓰고 첫 응답을 끝낸다. 첫 응답에는 Rank Math SEO 패키지, 대표 이미지 생성 프롬프트, 완성 본문을 만들지 않는다.
+최종 추천 리스트 바로 아래에 “작성할 번호만 입력하면, 해당 후보의 자동완성 캡처 추가 검증 여부를 먼저 묻습니다.”라고 쓰고 첫 응답을 끝낸다. 첫 응답에는 Rank Math SEO 패키지, 대표 이미지 생성 프롬프트, 완성 본문을 만들지 않는다.
 
-## 2단계: 번호 선택 후 전체 재검증
-사용자가 1, 2, 3처럼 번호만 입력하면 직전 추천 카드의 해당 번호를 선택한 것으로 해석한다. 선택 확인 질문이나 개요 반복 없이 즉시 최신 웹 검증부터 수행한다.
+## 2단계: 번호 선택 후 자동완성 캡처 선택
+사용자가 1, 2, 3처럼 번호만 입력하면 직전 추천 카드의 해당 번호를 선택한 것으로 해석한다. 이 단계에서는 아직 완성 글을 작성하지 않는다. 먼저 해당 후보의 대표 핵심 롱테일과 코드 수집 자동완성·최신 SERP를 참고해 “캡처 권장 검색어” 1개를 정한다.
+
+반드시 아래 형식으로만 답하고 멈춘다.
+### 자동완성 캡처 정밀검증
+- **선택 후보:** 번호 · 추천 제목
+- **캡처 권장 검색어:** 네이버 검색창에 그대로 입력할 짧고 자연스러운 검색어 1개
+- **선정 이유:** 이 검색어가 대표 롱테일의 실제 표현을 확인하는 데 유리한 이유 1문장
+
+**NAVER 자동완성 캡처를 추가로 검증할까요?**
+1. **예** — 위 “캡처 권장 검색어”를 네이버 검색창에 입력하고 자동완성 목록 전체가 보이도록 캡처한 이미지를 첨부한다.
+2. **아니오** — 캡처 없이 기존 코드 수집 자동완성, Search Trend, Google SERP, Naver SERP로 바로 진행한다.
+
+예외 규칙:
+- 사용자가 번호와 함께 NAVER 자동완성 캡처 이미지를 이미 첨부했다면 이 질문을 반복하지 말고 이미지를 판독한 뒤 3단계로 진행한다.
+- 사용자가 “캡처 없이”, “바로 작성”, “2”처럼 명확히 거절하면 질문을 반복하지 말고 3단계로 진행한다.
+- 사용자가 “1”, “예”, “캡처할게”라고 답했지만 이미지가 아직 없다면 캡처 권장 검색어를 다시 짧게 안내하고 이미지 첨부를 기다리며 멈춘다.
+- 이미지가 첨부되면 화면에 실제 보이는 자동완성어를 모두 원문 그대로 추출하고, 코드 수집 자동완성과 겹치는 표현/새 표현/차이를 구분한 뒤 대표 롱테일을 재평가한다.
+
+## 3단계: 선택 후보 전체 재검증 및 글 작성
+사용자가 자동완성 캡처를 첨부했거나 캡처 없이 진행한다고 답한 뒤에만 전체 재검증을 수행한다.
 
 다음 중 하나라도 실패하면 완성 글을 만들지 않고 “# 검증 보류”만 출력한다.
 - 사건의 정확한 대상·기준 날짜·현재 상태를 확정하지 못함
@@ -177,7 +195,7 @@ AI 추천 점수는 최종 검증을 반영해 다시 산정할 수 있지만, �
 - **보조 검색 의도:** 최대 4개와 각 의도가 본문의 어느 영역에서 해결되는지
 - **Google SEO 검증:** SERP 상위 문서 유형, 검색 의도, 경쟁 강도, 클릭 기회, 콘텐츠 공백
 - **Naver SEO 검증:** 통합검색 상단 구성, 자동완성 활용 여부, 경쟁 강도, 클릭 기회, 콘텐츠 공백
-- **사용자 자동완성 캡처 검증:** 선택 여부, 실제 첨부 여부, 캡처 기준 검색어, 화면에서 판독한 자동완성어, 코드 수집 자동완성과의 일치·차이. 선택하지 않았으면 “선택 안 함”
+- **사용자 자동완성 캡처 검증:** 실시/미실시, 캡처 권장 검색어, 실제 첨부 여부, 화면에서 판독한 자동완성어, 코드 수집 자동완성과의 일치·차이. 사용자가 거절했으면 “미실시 — 사용자 선택”
 - **최종 롱테일 수요 검증:** 대표 검색어, 수요 신호 종류, 신뢰도, 월간 검색량 확인 가능 여부
 - **기존 글 중복 검토:** 신규 글/업데이트/통합/보강 판단
 - **내부링크 계획:** 실제 사용한 내부링크의 앵커 텍스트 | 대상 글 제목 | URL. 사용할 수 있는 URL이 없으면 “없음”
@@ -260,39 +278,16 @@ function formatCategoryPolicy(selection: CategorySelection): string {
 }
 
 function formatAutocomplete(item: NewsOpportunity): string {
-  if (item.autocomplete.status === "error") return "수집 실패";
-  if (item.autocomplete.suggestions.length === 0) return "자동완성 결과 없음";
+  if (item.autocomplete.status === "error") {
+    return "수집 실패 (검색 수요 없음 의미 아님)";
+  }
+  if (item.autocomplete.suggestions.length === 0) {
+    return "제안어 미확보 (검색 수요 없음 의미 아님)";
+  }
   return item.autocomplete.suggestions.join(" | ");
 }
 
-function formatCapturePlanSummary(
-  plans: ManualAutocompleteCapturePlan[],
-): string {
-  if (plans.length === 0) {
-    return [
-      "# 사용자 추가 자동완성 캡처 검증",
-      "- 선택된 후보 없음. 사용자 캡처 자동완성을 근거로 사용했다고 주장하지 말 것.",
-    ].join("\n");
-  }
-
-  return [
-    "# 사용자 추가 자동완성 캡처 검증",
-    `- 첨부 예정 후보: ${plans.length}개`,
-    "- 사용자는 이 전체 프롬프트와 함께 아래 순서에 대응하는 NAVER 검색창 자동완성 캡처 이미지를 첨부할 수 있다.",
-    "- 실제 이미지가 첨부되면 화면에 보이는 자동완성어만 판독하고, 보이지 않는 항목은 추정하지 않는다.",
-    "- 자동완성 캡처는 검색량 증거가 아니라 현재 검색 표현·의도 보조 신호다. 개인화나 최근 검색 이력 영향 가능성을 감안한다.",
-    "- 첨부 예정인데 이미지가 빠진 후보는 ‘캡처 미첨부’로 표시하고 기존 검증 신호로 계속 분석한다.",
-    ...plans.map(
-      (plan, index) =>
-        `${index + 1}. 후보 ${plan.rank} | 캡처 기준 검색어: ${plan.query} | 제목: ${plan.title}`,
-    ),
-  ].join("\n");
-}
-
-function formatOpportunity(
-  item: NewsOpportunity,
-  capturePlan?: ManualAutocompleteCapturePlan,
-): string {
+function formatOpportunity(item: NewsOpportunity): string {
   const articleLines = item.articles
     .slice(0, 6)
     .map(
@@ -309,10 +304,8 @@ function formatOpportunity(
     `- 카테고리: ${item.categoryLabel}`,
     `- 후보 출처: 뉴스 조기 신호`,
     `- 뉴스 헤드라인 핵심 키워드: ${item.autocomplete.query}`,
-    `- NAVER 자동완성: ${formatAutocomplete(item)}`,
-    capturePlan
-      ? `- 사용자 추가 자동완성 캡처: 첨부 예정 | 캡처 기준 검색어: ${capturePlan.query}`
-      : "- 사용자 추가 자동완성 캡처: 선택 안 함",
+    `- NAVER 자동완성 보조 수집: ${formatAutocomplete(item)}`,
+    "- 사용자 자동완성 캡처 검증: 아직 미실시 — 번호 선택 후 추가 여부 확인",
     `- 사전 추출 주제: ${item.topic}`,
     `- 검색어 트렌드 확인용 키워드: ${item.searchKeyword}`,
     `- 다음 검색 질문: ${item.secondQuestion}`,
@@ -332,14 +325,9 @@ export function buildNewsResearchPackage(input: {
   feed: NewsResearchResponse;
   prompt: string;
   existingContentInventory: string;
-  autocompleteCapturePlans?: ManualAutocompleteCapturePlan[];
 }): string {
   const { feed } = input;
   const existing = input.existingContentInventory.trim();
-  const capturePlans = input.autocompleteCapturePlans ?? [];
-  const capturePlanById = new Map(
-    capturePlans.map((plan) => [plan.opportunityId, plan]),
-  );
   return [
     input.prompt.trim() || DEFAULT_NEWS_RESEARCH_PROMPT,
     "",
@@ -353,7 +341,9 @@ export function buildNewsResearchPackage(input: {
     `- NAVER API 모드: ${feed.summary.apiMode === "hub" ? "API HUB" : "기존 Developer API fallback"}`,
     `- 뉴스 검색 시드: ${feed.summary.successfulSeedCount}/${feed.summary.requestedSeedCount} 성공, ${feed.summary.failedSeedCount} 실패`,
     `- 원본 뉴스 응답: ${feed.summary.rawArticleCount}건`,
-    `- 최근 ${formatWindowRange(feed.summary.windowHours)} 유효 뉴스: ${feed.summary.recentArticleCount}건`,
+    `- 신규 신호 탐지 범위: 최근 ${formatWindowRange(feed.summary.windowHours)}`,
+    `- 탐지 범위 안 신규 뉴스: ${feed.summary.recentArticleCount}건`,
+    `- 뉴스 확산 분석 범위: 최근 ${formatWindowRange(feed.summary.analysisWindowHours)}`,
     `- 사건 군집: ${feed.summary.clusterCount}개`,
     `- Search Trend 검증 성공 후보: ${feed.summary.trendValidatedCount}/${feed.opportunities.length}`,
     `- Naver 블로그 경쟁 사전검증 성공 후보: ${feed.summary.competitionValidatedCount}/${feed.opportunities.length}`,
@@ -361,14 +351,16 @@ export function buildNewsResearchPackage(input: {
     "- 주의: 뉴스 군집·롱테일·예비 점수·경쟁 위험·자동완성은 코드 기반 사전 압축 신호이며 최종 사실·SEO 판단은 반드시 최신 웹 검색으로 다시 검증할 것",
     feed.warnings.length > 0 ? `- 수집 경고: ${feed.warnings.join(" / ")}` : "- 수집 경고: 없음",
     "",
-    formatCapturePlanSummary(capturePlans),
+    "# 사용자 자동완성 캡처 정책",
+    "- 1단계 추천 카드에서는 아직 미실시 상태다. 사용자가 번호를 고른 뒤 ChatGPT가 캡처 추가 여부를 반드시 질문한다.",
+    "- 실제 캡처 이미지를 받기 전에는 사용자 캡처를 반영했다고 주장하지 않는다.",
     "",
     "# 기존 발행 콘텐츠",
     existing || "제공되지 않음. 기존 글 중복 검사를 완료했다고 주장하지 말 것.",
     "",
     `# 사전 후보 ${feed.opportunities.length}개`,
     feed.opportunities
-      .map((item) => formatOpportunity(item, capturePlanById.get(item.id)))
+      .map((item) => formatOpportunity(item))
       .join("\n\n"),
   ].join("\n");
 }

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   const windowHours =
     typeof body.windowHours === "number" && Number.isFinite(body.windowHours)
       ? body.windowHours
-      : 0.5;
+      : 1 / 6;
   const maxResults =
     typeof body.maxResults === "number" && Number.isFinite(body.maxResults)
       ? body.maxResults

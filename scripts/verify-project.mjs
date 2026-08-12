@@ -47,8 +47,9 @@ for (const marker of [
   "내부링크 계획",
   "독자 가치 자산을 최소 2개",
   "출판 SEO 점검",
-  "사용자 추가 자동완성 캡처",
-  "캡처 미첨부",
+  "자동완성 캡처 정밀검증",
+  "번호 선택 후 추가 여부 확인",
+  "제안어 미확보 (검색 수요 없음 의미 아님)",
 ]) {
   if (!prompt.includes(marker)) {
     console.error(`심층 검증 프롬프트 누락: ${marker}`);
@@ -72,12 +73,25 @@ const workbench = fs.readFileSync(
 );
 for (const marker of [
   "DEFAULT_PROMPT_VERSION",
-  "google-naver-adsense-autocomplete-capture-v3",
-  "자동완성 캡처 추가 검증",
-  "autocompleteCapturePlans",
+  "google-naver-adsense-interactive-autocomplete-v4",
+  "최근 10분 (기본 · 초고속 탐지)",
+  "copyResearchPackage(result, true)",
 ]) {
   if (!workbench.includes(marker)) {
-    console.error(`프롬프트 버전 전환 로직 누락: ${marker}`);
+    console.error(`10분 탐지·자동 복사 로직 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+const newsResearch = fs.readFileSync(path.join(root, "lib/news/news-research.ts"), "utf8");
+for (const marker of [
+  "clamp(input.windowHours, 1 / 6, 48)",
+  "Math.max(windowHours, 3)",
+  "detectionCutoff",
+  "analysisCutoff",
+]) {
+  if (!newsResearch.includes(marker)) {
+    console.error(`10분 탐지·3시간 확산 분석 로직 누락: ${marker}`);
     process.exit(1);
   }
 }

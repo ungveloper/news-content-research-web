@@ -468,8 +468,10 @@ export async function collectNewsOpportunities(input: {
 }): Promise<NewsResearchResponse> {
   const now = Date.now();
   const seeds = buildSeeds(input.categorySelection, input.customSeeds);
-  const windowHours = clamp(input.windowHours, 0.5, 48);
-  const cutoff = now - windowHours * 60 * 60 * 1000;
+  const windowHours = clamp(input.windowHours, 1 / 6, 48);
+  const analysisWindowHours = Math.max(windowHours, 3);
+  const detectionCutoff = now - windowHours * 60 * 60 * 1000;
+  const analysisCutoff = now - analysisWindowHours * 60 * 60 * 1000;
   const warnings: string[] = [];
   let successfulSeedCount = 0;
   let failedSeedCount = 0;
@@ -514,10 +516,21 @@ export async function collectNewsOpportunities(input: {
     }
   }
 
-  const recentArticles = [...deduplicated.values()]
-    .filter((article) => article.publishedTimestamp >= cutoff && article.publishedTimestamp <= now + 5 * 60 * 1000)
+  const analysisArticles = [...deduplicated.values()]
+    .filter(
+      (article) =>
+        article.publishedTimestamp >= analysisCutoff &&
+        article.publishedTimestamp <= now + 5 * 60 * 1000,
+    )
     .sort((a, b) => b.publishedTimestamp - a.publishedTimestamp);
-  const clusters = clusterArticles(recentArticles);
+  const recentArticles = analysisArticles.filter(
+    (article) => article.publishedTimestamp >= detectionCutoff,
+  );
+  const clusters = clusterArticles(analysisArticles).filter((cluster) =>
+    cluster.articles.some(
+      (article) => article.publishedTimestamp >= detectionCutoff,
+    ),
+  );
 
   let candidates: NewsOpportunity[] = clusters
     .filter((cluster) => {
@@ -645,7 +658,7 @@ export async function collectNewsOpportunities(input: {
     .map((item, index) => ({ ...item, rank: index + 1 }));
 
   if (recentArticles.length === 0) {
-    warnings.push("선택한 시간 범위에 포함되는 뉴스가 없습니다. 시간 범위를 넓혀 다시 수집해 보세요.");
+    warnings.push("선택한 신규 신호 탐지 범위에 포함되는 뉴스가 없습니다. 탐지 범위를 넓혀 다시 수집해 보세요.");
   }
   if (failedSeedCount > 0) {
     warnings.push("일부 시드 검색이 실패해 해당 시드는 점수 계산에서 제외했습니다.");
@@ -682,6 +695,7 @@ export async function collectNewsOpportunities(input: {
       autocompleteValidatedCount: candidates.filter((item) => item.autocomplete.status === "ok").length,
       apiMode: getNaverApiMode(),
       windowHours,
+      analysisWindowHours,
     },
     warnings,
   };

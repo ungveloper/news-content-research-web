@@ -100,6 +100,7 @@ export type NewsResearchSummary = {
   autocompleteValidatedCount: number;
   apiMode: "hub" | "legacy";
   windowHours: number;
+  analysisWindowHours: number;
 };
 
 export type NewsResearchResponse = {
