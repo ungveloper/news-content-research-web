@@ -219,6 +219,72 @@ input:focus, select:focus, textarea:focus { border-color: #6f98d9; box-shadow: 0
 .opportunity-copy-row span { display: block; margin-top: 4px; color: var(--muted); font-size: .78rem; line-height: 1.45; }
 .opportunity-copy-row .button { flex: 0 0 auto; white-space: nowrap; }
 
+.copy-package-button {
+  min-width: 178px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.button-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255,255,255,.42);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .72s linear infinite;
+  flex: 0 0 auto;
+}
+
+.copy-progress-card {
+  margin: -2px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #dbe7fb;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.copy-progress-card__text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+  color: #34435a;
+  font-size: .8rem;
+}
+
+.copy-progress-card__text strong {
+  color: var(--primary);
+  font-size: .82rem;
+  white-space: nowrap;
+}
+
+.copy-progress-track {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6eef9;
+}
+
+.copy-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width .18s ease;
+}
+
+.copy-progress-card small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
 .opportunity-list { display: grid; gap: 14px; }
 .opportunity-card { padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: white; transition: border-color .15s ease, box-shadow .15s ease; }
 .opportunity-card:hover { border-color: #b5c7df; box-shadow: 0 10px 24px rgba(28,48,78,.055); }

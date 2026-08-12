@@ -78,6 +78,9 @@ export default function NewsResearchWorkbench() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [copyingPackage, setCopyingPackage] = useState(false);
+  const [copyProgress, setCopyProgress] = useState(0);
+  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     const savedPrompt = window.localStorage.getItem(PROMPT_STORAGE_KEY);
@@ -159,6 +162,77 @@ export default function NewsResearchWorkbench() {
       setNotice(successMessage);
     } catch {
       setError("클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.");
+    }
+  }
+
+  async function waitForPaint() {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  }
+
+  async function copyResearchPackage() {
+    if (!feed || copyingPackage) return;
+
+    setCopyingPackage(true);
+    setCopyProgress(25);
+    setCopyStatus(`1/4 · 후보 ${feed.opportunities.length}개 확인 중`);
+    setError("");
+    setNotice("");
+
+    try {
+      await waitForPaint();
+
+      if (feed.opportunities.length === 0) {
+        throw new Error("복사할 뉴스 후보가 없습니다.");
+      }
+
+      setCopyProgress(50);
+      setCopyStatus("2/4 · ChatGPT 심층 검증 프롬프트 생성 중");
+      await waitForPaint();
+
+      const packageText = buildNewsResearchPackage({
+        feed,
+        prompt,
+        existingContentInventory,
+      });
+
+      if (!packageText.trim()) {
+        throw new Error("ChatGPT용 전체 패키지를 생성하지 못했습니다.");
+      }
+
+      setCopyProgress(75);
+      setCopyStatus("3/4 · 클립보드에 전체 패키지 복사 중");
+      await waitForPaint();
+
+      await navigator.clipboard.writeText(packageText);
+
+      setCopyProgress(100);
+      setCopyStatus(
+        `4/4 · 복사 완료 · ${packageText.length.toLocaleString("ko-KR")}자`,
+      );
+      setNotice(
+        `ChatGPT용 전체 패키지와 후보 ${feed.opportunities.length}개를 복사했습니다.`,
+      );
+    } catch (caught) {
+      const message =
+        caught instanceof Error &&
+        (caught.message === "복사할 뉴스 후보가 없습니다." ||
+          caught.message === "ChatGPT용 전체 패키지를 생성하지 못했습니다.")
+          ? caught.message
+          : "클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.";
+
+      setError(message);
+      setCopyingPackage(false);
+      setCopyProgress(0);
+      setCopyStatus("");
+      return;
+    } finally {
+      window.setTimeout(() => {
+        setCopyingPackage(false);
+        setCopyProgress(0);
+        setCopyStatus("");
+      }, 1400);
     }
   }
 
@@ -308,19 +382,42 @@ export default function NewsResearchWorkbench() {
                 <span>아래 목록을 끝까지 확인하지 않아도 현재 수집된 전체 후보와 검증 프롬프트가 함께 복사됩니다.</span>
               </div>
               <button
-                className="button button--primary"
+                className="button button--primary copy-package-button"
                 type="button"
-                disabled={!researchPackage}
-                onClick={() =>
-                  void copyText(
-                    researchPackage,
-                    `ChatGPT용 전체 패키지와 후보 ${feed.opportunities.length}개를 복사했습니다.`,
-                  )
-                }
+                disabled={!researchPackage || copyingPackage}
+                aria-busy={copyingPackage}
+                onClick={() => void copyResearchPackage()}
               >
-                ChatGPT용 전체 복사
+                {copyingPackage ? (
+                  <>
+                    <span className="button-spinner" aria-hidden="true" />
+                    <span>{copyProgress === 100 ? "복사 완료" : "복사 중…"}</span>
+                  </>
+                ) : (
+                  "ChatGPT용 전체 복사"
+                )}
               </button>
             </div>
+
+            {copyingPackage || copyProgress > 0 ? (
+              <div className="copy-progress-card" role="status" aria-live="polite">
+                <div className="copy-progress-card__text">
+                  <span>{copyStatus}</span>
+                  <strong>{copyProgress}%</strong>
+                </div>
+                <div
+                  className="copy-progress-track"
+                  role="progressbar"
+                  aria-label="ChatGPT용 전체 복사 단계 진행률"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={copyProgress}
+                >
+                  <span style={{ width: `${copyProgress}%` }} />
+                </div>
+                <small>클립보드 API는 바이트 단위 전송률을 제공하지 않아 실제 작업 단계 4개를 기준으로 표시합니다.</small>
+              </div>
+            ) : null}
 
             <div className="opportunity-list">
               {feed.opportunities.map((item) => {
