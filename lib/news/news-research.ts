@@ -15,6 +15,7 @@ import {
 import {
   buildCompetitionSignal,
   calculatePreliminaryScore,
+  calculateSearchOpportunityAssessment,
   emptyCompetitionSignal,
   stripHtml,
   tokenSimilarity,
@@ -456,6 +457,7 @@ function buildReasons(item: NewsOpportunity): string[] {
   if (item.trend.status === "ok" && (item.trend.momentumPercent ?? 0) > 20) reasons.push(`Naver 검색 추세 최근 평균이 기준 구간보다 ${Math.round(item.trend.momentumPercent ?? 0)}% 높습니다.`);
   if (item.autocomplete.status === "ok") reasons.push(`핵심 키워드 “${item.autocomplete.query}” 입력 시 Naver 자동완성 ${item.autocomplete.suggestions.length}개를 확보해 실제 검색 표현 후보로 사용할 수 있습니다.`);
   if (item.competition.status === "ok") reasons.push(`롱테일 힌트 기준 Naver 블로그 검색 경쟁 위험을 ${item.competition.riskLevel}(${item.competition.riskScore}/100)으로 사전 추정했습니다.`);
+  reasons.push(`검색 기회 점수 ${item.searchOpportunity.score}/100(${item.searchOpportunity.level}, 게이트 ${item.searchOpportunity.gate})으로 수요·경쟁 여지·검색 의도·콘텐츠 공백을 함께 평가했습니다.`);
   reasons.push(`뉴스 자체 요약보다 “${item.secondQuestion}”라는 후속 검색 의도로 전환할 수 있습니다.`);
   return reasons.slice(0, 5);
 }
@@ -566,6 +568,18 @@ export async function collectNewsOpportunities(input: {
         trend: placeholderTrend,
         competition: placeholderCompetition,
       });
+      const searchOpportunity = calculateSearchOpportunityAssessment({
+        last1HourCount,
+        last3HourCount,
+        publisherCount,
+        ageMinutes,
+        title: representative.title,
+        longtailHint: derived.longtailHint,
+        category,
+        trend: placeholderTrend,
+        competition: placeholderCompetition,
+        autocompleteCount: 0,
+      });
 
       return {
         id: `news-${index}-${Buffer.from(`${topic}-${representative.publishedAt}`).toString("base64url").slice(0, 10)}`,
@@ -591,6 +605,7 @@ export async function collectNewsOpportunities(input: {
         trend: placeholderTrend,
         competition: placeholderCompetition,
         preliminaryAiScore: preliminary.score,
+        searchOpportunity,
         scoreBreakdown: preliminary.breakdown,
         reasons: [],
         articles: sorted.slice(0, 8).map(toArticleSummary),
@@ -635,10 +650,23 @@ export async function collectNewsOpportunities(input: {
       trend: item.trend,
       competition,
     });
+    const searchOpportunity = calculateSearchOpportunityAssessment({
+      last1HourCount: item.last1HourCount,
+      last3HourCount: item.last3HourCount,
+      publisherCount: item.independentPublisherCount,
+      ageMinutes: item.ageMinutes,
+      title: item.representativeTitle,
+      longtailHint: item.longtailHint,
+      category,
+      trend: item.trend,
+      competition,
+      autocompleteCount: item.autocomplete.suggestions.length,
+    });
     const updated = {
       ...item,
       competition,
       preliminaryAiScore: preliminary.score,
+      searchOpportunity,
       scoreBreakdown: preliminary.breakdown,
     };
     return {
@@ -647,9 +675,16 @@ export async function collectNewsOpportunities(input: {
     };
   });
 
+  const searchOpportunityEvaluatedCount = candidates.length;
+  const searchOpportunityExcludedCount = candidates.filter(
+    (item) => item.searchOpportunity.gate === "제외",
+  ).length;
+
   candidates = candidates
+    .filter((item) => item.searchOpportunity.gate !== "제외")
     .sort(
       (a, b) =>
+        b.searchOpportunity.score - a.searchOpportunity.score ||
         b.preliminaryAiScore - a.preliminaryAiScore ||
         a.competition.riskScore - b.competition.riskScore ||
         b.independentPublisherCount - a.independentPublisherCount,
@@ -662,6 +697,11 @@ export async function collectNewsOpportunities(input: {
   }
   if (failedSeedCount > 0) {
     warnings.push("일부 시드 검색이 실패해 해당 시드는 점수 계산에서 제외했습니다.");
+  }
+  if (searchOpportunityExcludedCount > 0) {
+    warnings.push(
+      `사전 검색 기회 게이트에서 ${searchOpportunityExcludedCount}개 후보를 제외했습니다. 낮은 경쟁만으로 기회라고 보지 않고 수요·검색 의도·콘텐츠 공백·증거 강도를 함께 반영했습니다.`,
+    );
   }
   if (
     candidates.length > 0 &&
@@ -693,6 +733,8 @@ export async function collectNewsOpportunities(input: {
       trendValidatedCount: candidates.filter((item) => item.trend.status === "ok").length,
       competitionValidatedCount: candidates.filter((item) => item.competition.status === "ok").length,
       autocompleteValidatedCount: candidates.filter((item) => item.autocomplete.status === "ok").length,
+      searchOpportunityEvaluatedCount,
+      searchOpportunityExcludedCount,
       apiMode: getNaverApiMode(),
       windowHours,
       analysisWindowHours,

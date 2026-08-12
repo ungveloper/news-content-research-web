@@ -3,6 +3,8 @@ import type { BlogCategoryId } from "@/lib/categories";
 export type CategorySelection = "all" | BlogCategoryId;
 
 export type CompetitionRiskLevel = "낮음" | "보통" | "높음" | "매우 높음";
+export type SearchOpportunityLevel = "낮음" | "보통" | "높음" | "매우 높음";
+export type SearchOpportunityGate = "통과" | "주의" | "제외";
 
 export type ManualAutocompleteCapturePlan = {
   opportunityId: string;
@@ -47,6 +49,24 @@ export type CompetitionSignal = {
   riskLevel: CompetitionRiskLevel;
 };
 
+
+export type SearchOpportunityBreakdown = {
+  demandPotential: number;
+  competitionHeadroom: number;
+  intentSpecificity: number;
+  contentGapPotential: number;
+  timingWindow: number;
+  evidenceStrength: number;
+};
+
+export type SearchOpportunityAssessment = {
+  score: number;
+  level: SearchOpportunityLevel;
+  gate: SearchOpportunityGate;
+  breakdown: SearchOpportunityBreakdown;
+  reasons: string[];
+};
+
 export type ScoreBreakdown = {
   newsVelocity: number;
   searchInterest: number;
@@ -81,6 +101,7 @@ export type NewsOpportunity = {
   trend: SearchTrendSignal;
   competition: CompetitionSignal;
   preliminaryAiScore: number;
+  searchOpportunity: SearchOpportunityAssessment;
   scoreBreakdown: ScoreBreakdown;
   reasons: string[];
   articles: NewsArticleSummary[];
@@ -98,6 +119,8 @@ export type NewsResearchSummary = {
   trendValidatedCount: number;
   competitionValidatedCount: number;
   autocompleteValidatedCount: number;
+  searchOpportunityEvaluatedCount: number;
+  searchOpportunityExcludedCount: number;
   apiMode: "hub" | "legacy";
   windowHours: number;
   analysisWindowHours: number;

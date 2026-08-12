@@ -41,6 +41,8 @@ for (const marker of [
   "예비 AI 추천 점수",
   "예상 경쟁 위험",
   "대표 핵심 롱테일",
+  "검색 기회 점수",
+  "사전 검색 기회 게이트 해석",
   "Google SEO 검증",
   "Naver SEO 검증",
   "AdSense 콘텐츠 가치",
@@ -62,8 +64,9 @@ for (const marker of [
 const scoreIndex = prompt.indexOf("- **예비 AI 추천 점수:**");
 const riskIndex = prompt.indexOf("- **예상 경쟁 위험:**");
 const longtailIndex = prompt.indexOf("- **대표 핵심 롱테일:**");
+const opportunityIndex = prompt.indexOf("- **검색 기회 점수:**");
 const categoryIndex = prompt.indexOf("- **카테고리:**");
-if (!(scoreIndex < riskIndex && riskIndex < longtailIndex && longtailIndex < categoryIndex)) {
+if (!(scoreIndex < riskIndex && riskIndex < longtailIndex && longtailIndex < opportunityIndex && opportunityIndex < categoryIndex)) {
   console.error("최종 추천 카드의 핵심 정보 순서가 올바르지 않습니다.");
   process.exit(1);
 }
@@ -75,7 +78,7 @@ const workbench = fs.readFileSync(
 );
 for (const marker of [
   "DEFAULT_PROMPT_VERSION",
-  "google-naver-adsense-conditional-autocomplete-v5",
+  "google-naver-adsense-search-opportunity-v6",
   "최근 10분 (기본 · 초고속 탐지)",
   "copyResearchPackage(result, true)",
 ]) {
@@ -96,6 +99,24 @@ for (const marker of [
     console.error(`10분 탐지·3시간 확산 분석 로직 누락: ${marker}`);
     process.exit(1);
   }
+}
+
+const scoring = fs.readFileSync(path.join(root, "lib/news/scoring.ts"), "utf8");
+for (const marker of [
+  "calculateSearchOpportunityAssessment",
+  "competitionHeadroom",
+  "contentGapPotential",
+  "gate",
+]) {
+  if (!scoring.includes(marker)) {
+    console.error(`검색 기회 점수 로직 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+if (!newsResearch.includes('item.searchOpportunity.gate !== "제외"')) {
+  console.error("검색 기회 게이트 제외 로직이 누락되었습니다.");
+  process.exit(1);
 }
 
 const naverApi = fs.readFileSync(path.join(root, "lib/news/naver-api.ts"), "utf8");

@@ -16,7 +16,7 @@ import type {
 
 const PROMPT_STORAGE_KEY = "news-content-research:prompt";
 const PROMPT_STORAGE_VERSION_KEY = "news-content-research:prompt-version";
-const DEFAULT_PROMPT_VERSION = "google-naver-adsense-conditional-autocomplete-v5";
+const DEFAULT_PROMPT_VERSION = "google-naver-adsense-search-opportunity-v6";
 const EXISTING_CONTENT_STORAGE_KEY = "news-content-research:existing-content";
 const CATEGORY_STORAGE_KEY = "news-content-research:category";
 
@@ -385,6 +385,10 @@ export default function NewsResearchWorkbench() {
               <div><span>경쟁 검증</span><strong>{feed.summary.competitionValidatedCount}/{feed.opportunities.length}</strong></div>
               <div><span>자동완성</span><strong>{feed.summary.autocompleteValidatedCount}/{feed.opportunities.length}</strong></div>
             </div>
+            <div className="opportunity-gate-summary">
+              <strong>검색 기회 게이트</strong>
+              <span>{feed.summary.searchOpportunityEvaluatedCount}개 평가 · {feed.summary.searchOpportunityExcludedCount}개 제외 · 통과/주의 {feed.summary.searchOpportunityEvaluatedCount - feed.summary.searchOpportunityExcludedCount}개 중 상위 {feed.opportunities.length}개 표시</span>
+            </div>
             {feed.warnings.length > 0 ? (
               <details className="warning-details">
                 <summary>수집 경고 {feed.warnings.length}개</summary>
@@ -398,7 +402,7 @@ export default function NewsResearchWorkbench() {
               <div>
                 <span className="step">STEP 3</span>
                 <h2>뉴스 검색 기회 후보</h2>
-                <p>예비 AI 추천 점수는 최종 성공 확률이 아니라 심층 검증 순서를 정하는 사전 상대 점수입니다.</p>
+                <p>예비 AI 추천 점수는 우선순위, 검색 기회 점수는 수요·경쟁 여지·검색 의도·콘텐츠 공백을 함께 보는 사전 기회 지표입니다. 둘 다 최종 성공 확률은 아닙니다.</p>
               </div>
             </div>
 
@@ -457,6 +461,7 @@ export default function NewsResearchWorkbench() {
                           <span className="badge badge--category">{item.categoryLabel}</span>
                           <span className={`badge badge--velocity badge--${item.newsVelocityLabel}`}>{item.newsVelocityLabel}</span>
                           <span className={`badge risk risk--${item.competition.riskLevel.replace(" ", "-")}`}>경쟁 {item.competition.riskLevel}</span>
+                          <span className={`badge opportunity opportunity--${item.searchOpportunity.level.replace(" ", "-")}`}>기회 {item.searchOpportunity.level}</span>
                         </div>
                         <h3>{item.representativeTitle}</h3>
                         <p>{item.secondQuestion}</p>
@@ -483,6 +488,11 @@ export default function NewsResearchWorkbench() {
                         <span>예상 경쟁 위험</span>
                         <strong>{item.competition.riskScore}/100</strong>
                         <small>블로그 결과 {item.competition.blogResultTotal?.toLocaleString("ko-KR") ?? "-"}건</small>
+                      </div>
+                      <div className="search-opportunity-signal">
+                        <span>검색 기회 점수</span>
+                        <strong>{item.searchOpportunity.score}/100 · {item.searchOpportunity.level}</strong>
+                        <small>게이트 {item.searchOpportunity.gate} · 수요·경쟁여지·의도·공백 종합</small>
                       </div>
                       <div>
                         <span>대표 롱테일 힌트</span>
@@ -511,6 +521,18 @@ export default function NewsResearchWorkbench() {
                             <li>콘텐츠 공백 <b>{item.scoreBreakdown.contentGap}/10</b></li>
                             <li>발행 타이밍 <b>{item.scoreBreakdown.timing}/5</b></li>
                           </ul>
+                        </div>
+                        <div>
+                          <h4>검색 기회 세부</h4>
+                          <ul className="breakdown-list">
+                            <li>수요 가능성 <b>{item.searchOpportunity.breakdown.demandPotential}/25</b></li>
+                            <li>경쟁 진입 여지 <b>{item.searchOpportunity.breakdown.competitionHeadroom}/20</b></li>
+                            <li>검색 의도 구체성 <b>{item.searchOpportunity.breakdown.intentSpecificity}/20</b></li>
+                            <li>콘텐츠 공백 가능성 <b>{item.searchOpportunity.breakdown.contentGapPotential}/15</b></li>
+                            <li>발행 타이밍 <b>{item.searchOpportunity.breakdown.timingWindow}/10</b></li>
+                            <li>증거 강도 <b>{item.searchOpportunity.breakdown.evidenceStrength}/10</b></li>
+                          </ul>
+                          <small className="opportunity-gate-note">게이트 {item.searchOpportunity.gate} · 낮은 경쟁만으로 높은 기회로 판정하지 않습니다.</small>
                         </div>
                         <div>
                           <h4>사전 판정 근거</h4>

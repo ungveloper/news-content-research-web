@@ -3,6 +3,8 @@ import type {
   CompetitionRiskLevel,
   CompetitionSignal,
   ScoreBreakdown,
+  SearchOpportunityAssessment,
+  SearchOpportunityLevel,
   SearchTrendSignal,
 } from "@/lib/types";
 
@@ -167,6 +169,155 @@ export function getClarityScore(title: string, category: BlogCategory): number {
   ].filter((keyword) => normalized.includes(keyword)).length;
 
   return clamp(8 + hits * 3 + universalIntent * 2, 8, 20);
+}
+
+
+export function getSearchOpportunityLevel(score: number): SearchOpportunityLevel {
+  if (score >= 82) return "매우 높음";
+  if (score >= 70) return "높음";
+  if (score >= 55) return "보통";
+  return "낮음";
+}
+
+export function calculateSearchOpportunityAssessment(input: {
+  last1HourCount: number;
+  last3HourCount: number;
+  publisherCount: number;
+  ageMinutes: number;
+  title: string;
+  longtailHint: string;
+  category: BlogCategory;
+  trend: SearchTrendSignal;
+  competition: CompetitionSignal;
+  autocompleteCount: number;
+}): SearchOpportunityAssessment {
+  const trendDemand = Math.round(clamp(getSearchInterestScore(input.trend) * 0.75, 0, 15));
+  const newsDemand = Math.round(
+    clamp(
+      input.last1HourCount * 1.35 +
+        input.last3HourCount * 0.28 +
+        input.publisherCount * 0.5,
+      0,
+      8,
+    ),
+  );
+  const autocompleteDemand = input.autocompleteCount > 0 ? 2 : 0;
+  let demandPotential = Math.round(
+    clamp(trendDemand + newsDemand + autocompleteDemand, 0, 25),
+  );
+
+  const hasNoIndependentDemandSignal =
+    input.trend.status !== "ok" && input.autocompleteCount === 0;
+  if (hasNoIndependentDemandSignal) {
+    demandPotential = Math.max(4, demandPotential - 2);
+  }
+
+  const longtailTokenCount = tokenize(input.longtailHint).length;
+  const longtailShapeAdjustment =
+    longtailTokenCount >= 3 && longtailTokenCount <= 8 ? 0 : -2;
+  const intentSpecificity = Math.round(
+    clamp(
+      getClarityScore(input.title, input.category) + longtailShapeAdjustment,
+      5,
+      20,
+    ),
+  );
+
+  const competitionHeadroom =
+    input.competition.status === "ok"
+      ? Math.round(clamp((100 - input.competition.riskScore) * 0.2, 2, 20))
+      : 8;
+
+  const similarTopResultCount = input.competition.similarTopResultCount ?? 5;
+  const similarityAverage = input.competition.titleSimilarityAverage ?? 0.35;
+  let contentGapPotential =
+    similarTopResultCount === 0
+      ? 15
+      : similarTopResultCount <= 1
+        ? 13
+        : similarTopResultCount <= 2
+          ? 11
+          : similarTopResultCount <= 4
+            ? 8
+            : similarTopResultCount <= 6
+              ? 5
+              : 3;
+  if (similarityAverage >= 0.45) contentGapPotential -= 2;
+  if (
+    input.competition.blogResultTotal === 0 &&
+    hasNoIndependentDemandSignal
+  ) {
+    contentGapPotential -= 4;
+  }
+  contentGapPotential = Math.round(clamp(contentGapPotential, 2, 15));
+
+  const timingWindow =
+    input.ageMinutes <= 30
+      ? 10
+      : input.ageMinutes <= 60
+        ? 9
+        : input.ageMinutes <= 120
+          ? 8
+          : input.ageMinutes <= 360
+            ? 6
+            : input.ageMinutes <= 720
+              ? 4
+              : 2;
+
+  const publisherEvidence =
+    input.publisherCount >= 8
+      ? 6
+      : input.publisherCount >= 5
+        ? 5
+        : input.publisherCount >= 3
+          ? 4
+          : input.publisherCount >= 2
+            ? 3
+            : 1;
+  const evidenceStrength = Math.round(
+    clamp(
+      publisherEvidence +
+        (input.trend.status === "ok" ? 2 : 0) +
+        (input.autocompleteCount > 0 ? 2 : 0),
+      1,
+      10,
+    ),
+  );
+
+  const breakdown = {
+    demandPotential,
+    competitionHeadroom,
+    intentSpecificity,
+    contentGapPotential,
+    timingWindow,
+    evidenceStrength,
+  };
+  const score = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+  const level = getSearchOpportunityLevel(score);
+  const gate =
+    score < 55 ||
+    (input.competition.riskScore >= 85 && score < 82) ||
+    (input.competition.riskScore >= 65 && score < 65)
+      ? "제외"
+      : input.competition.riskScore >= 65 || score < 70
+        ? "주의"
+        : "통과";
+
+  const reasons: string[] = [];
+  if (demandPotential >= 18) reasons.push("검색·뉴스 수요 신호가 강합니다.");
+  if (intentSpecificity >= 16) reasons.push("후속 검색 의도가 구체적입니다.");
+  if (competitionHeadroom >= 14) reasons.push("사전 경쟁 신호 대비 진입 여지가 있습니다.");
+  if (contentGapPotential >= 11) reasons.push("유사 제목이 적어 콘텐츠 공백 가능성이 있습니다.");
+  if (hasNoIndependentDemandSignal) reasons.push("Trend·자동완성 신호가 없어 수요 확신도는 보수적으로 낮췄습니다.");
+  if (input.competition.riskScore >= 65) reasons.push("경쟁 위험이 높아 실제 Google·Naver SERP 재검증이 필수입니다.");
+
+  return {
+    score,
+    level,
+    gate,
+    breakdown,
+    reasons: reasons.slice(0, 4),
+  };
 }
 
 export function calculatePreliminaryScore(input: {
