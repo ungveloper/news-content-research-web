@@ -47,6 +47,8 @@ for (const marker of [
   "내부링크 계획",
   "독자 가치 자산을 최소 2개",
   "출판 SEO 점검",
+  "사용자 추가 자동완성 캡처",
+  "캡처 미첨부",
 ]) {
   if (!prompt.includes(marker)) {
     console.error(`심층 검증 프롬프트 누락: ${marker}`);
@@ -68,7 +70,12 @@ const workbench = fs.readFileSync(
   path.join(root, "components/news-research-workbench.tsx"),
   "utf8",
 );
-for (const marker of ["DEFAULT_PROMPT_VERSION", "google-naver-adsense-v2"]) {
+for (const marker of [
+  "DEFAULT_PROMPT_VERSION",
+  "google-naver-adsense-autocomplete-capture-v3",
+  "자동완성 캡처 추가 검증",
+  "autocompleteCapturePlans",
+]) {
   if (!workbench.includes(marker)) {
     console.error(`프롬프트 버전 전환 로직 누락: ${marker}`);
     process.exit(1);

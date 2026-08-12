@@ -4,6 +4,13 @@ export type CategorySelection = "all" | BlogCategoryId;
 
 export type CompetitionRiskLevel = "낮음" | "보통" | "높음" | "매우 높음";
 
+export type ManualAutocompleteCapturePlan = {
+  opportunityId: string;
+  rank: number;
+  title: string;
+  query: string;
+};
+
 export type NewsArticleSummary = {
   title: string;
   description: string;

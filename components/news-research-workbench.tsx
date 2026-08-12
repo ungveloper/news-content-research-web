@@ -9,6 +9,7 @@ import {
 } from "@/lib/research-package";
 import type {
   CategorySelection,
+  ManualAutocompleteCapturePlan,
   NewsOpportunity,
   NewsResearchErrorResponse,
   NewsResearchResponse,
@@ -16,7 +17,7 @@ import type {
 
 const PROMPT_STORAGE_KEY = "news-content-research:prompt";
 const PROMPT_STORAGE_VERSION_KEY = "news-content-research:prompt-version";
-const DEFAULT_PROMPT_VERSION = "google-naver-adsense-v2";
+const DEFAULT_PROMPT_VERSION = "google-naver-adsense-autocomplete-capture-v3";
 const EXISTING_CONTENT_STORAGE_KEY = "news-content-research:existing-content";
 const CATEGORY_STORAGE_KEY = "news-content-research:category";
 
@@ -83,6 +84,9 @@ export default function NewsResearchWorkbench() {
   const [copyingPackage, setCopyingPackage] = useState(false);
   const [copyProgress, setCopyProgress] = useState(0);
   const [copyStatus, setCopyStatus] = useState("");
+  const [manualAutocompleteQueries, setManualAutocompleteQueries] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     const savedPrompt = window.localStorage.getItem(PROMPT_STORAGE_KEY);
@@ -108,14 +112,32 @@ export default function NewsResearchWorkbench() {
     return () => window.cancelAnimationFrame(frameId);
   }, []);
 
+  const autocompleteCapturePlans = useMemo<ManualAutocompleteCapturePlan[]>(() => {
+    if (!feed) return [];
+
+    return feed.opportunities.flatMap((item) => {
+      if (!(item.id in manualAutocompleteQueries)) return [];
+      const query = manualAutocompleteQueries[item.id].trim() || item.autocomplete.query;
+      if (!query) return [];
+
+      return [{
+        opportunityId: item.id,
+        rank: item.rank,
+        title: item.representativeTitle,
+        query,
+      }];
+    });
+  }, [feed, manualAutocompleteQueries]);
+
   const researchPackage = useMemo(() => {
     if (!feed) return "";
     return buildNewsResearchPackage({
       feed,
       prompt,
       existingContentInventory,
+      autocompleteCapturePlans,
     });
-  }, [existingContentInventory, feed, prompt]);
+  }, [autocompleteCapturePlans, existingContentInventory, feed, prompt]);
 
   async function collect() {
     if (loading) return;
@@ -124,6 +146,7 @@ export default function NewsResearchWorkbench() {
     setNotice("");
     setFeed(null);
     setExpandedId(null);
+    setManualAutocompleteQueries({});
 
     const customSeeds = customSeedText
       .split(/[,\n]/)
@@ -183,7 +206,7 @@ export default function NewsResearchWorkbench() {
 
     setCopyingPackage(true);
     setCopyProgress(25);
-    setCopyStatus(`1/4 · 후보 ${feed.opportunities.length}개 확인 중`);
+    setCopyStatus(`1/4 · 후보 ${feed.opportunities.length}개 · 캡처 ${autocompleteCapturePlans.length}개 확인 중`);
     setError("");
     setNotice("");
 
@@ -202,6 +225,7 @@ export default function NewsResearchWorkbench() {
         feed,
         prompt,
         existingContentInventory,
+        autocompleteCapturePlans,
       });
 
       if (!packageText.trim()) {
@@ -219,7 +243,9 @@ export default function NewsResearchWorkbench() {
         `4/4 · 복사 완료 · ${packageText.length.toLocaleString("ko-KR")}자`,
       );
       setNotice(
-        `ChatGPT용 전체 패키지와 후보 ${feed.opportunities.length}개를 복사했습니다.`,
+        autocompleteCapturePlans.length > 0
+          ? `ChatGPT용 전체 패키지를 복사했습니다. 선택한 자동완성 캡처 ${autocompleteCapturePlans.length}장을 ChatGPT Pro에 함께 첨부해 주세요.`
+          : `ChatGPT용 전체 패키지와 후보 ${feed.opportunities.length}개를 복사했습니다.`,
       );
     } catch (caught) {
       const message =
@@ -241,6 +267,28 @@ export default function NewsResearchWorkbench() {
         setCopyStatus("");
       }, 1400);
     }
+  }
+
+  function toggleManualAutocompleteCapture(item: NewsOpportunity) {
+    setManualAutocompleteQueries((current) => {
+      if (item.id in current) {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      }
+
+      return {
+        ...current,
+        [item.id]: item.autocomplete.query || item.searchKeyword || item.longtailHint,
+      };
+    });
+  }
+
+  function updateManualAutocompleteQuery(item: NewsOpportunity, value: string) {
+    setManualAutocompleteQueries((current) => ({
+      ...current,
+      [item.id]: value,
+    }));
   }
 
   function saveSettings() {
@@ -391,6 +439,11 @@ export default function NewsResearchWorkbench() {
               <div>
                 <strong>후보 {feed.opportunities.length}개 전체를 ChatGPT Pro에서 재검증</strong>
                 <span>아래 목록을 끝까지 확인하지 않아도 현재 수집된 전체 후보와 검증 프롬프트가 함께 복사됩니다.</span>
+                {autocompleteCapturePlans.length > 0 ? (
+                  <span className="capture-selection-note">
+                    자동완성 캡처 추가 검증 {autocompleteCapturePlans.length}개 선택됨 · 전체 복사 후 해당 이미지를 ChatGPT Pro에 함께 첨부하세요.
+                  </span>
+                ) : null}
               </div>
               <button
                 className="button button--primary copy-package-button"
@@ -433,6 +486,10 @@ export default function NewsResearchWorkbench() {
             <div className="opportunity-list">
               {feed.opportunities.map((item) => {
                 const expanded = expandedId === item.id;
+                const captureSelected = item.id in manualAutocompleteQueries;
+                const captureQuery = captureSelected
+                  ? manualAutocompleteQueries[item.id]
+                  : item.autocomplete.query || item.searchKeyword || item.longtailHint;
                 return (
                   <article className="opportunity-card" key={item.id}>
                     <div className="opportunity-card__top">
@@ -474,6 +531,50 @@ export default function NewsResearchWorkbench() {
                         <strong className="longtail">{item.longtailHint}</strong>
                         <small>최종 표현은 ChatGPT가 SERP 재검증</small>
                       </div>
+                    </div>
+
+                    <div className={`manual-autocomplete-card${captureSelected ? " is-selected" : ""}`}>
+                      <label className="manual-autocomplete-toggle">
+                        <input
+                          type="checkbox"
+                          checked={captureSelected}
+                          onChange={() => toggleManualAutocompleteCapture(item)}
+                        />
+                        <span>
+                          <strong>자동완성 캡처 추가 검증</strong>
+                          <small>이 후보만 네이버 검색창 자동완성 화면을 직접 캡처해 ChatGPT Pro의 롱테일 검증에 추가합니다.</small>
+                        </span>
+                      </label>
+
+                      {captureSelected ? (
+                        <div className="manual-autocomplete-config">
+                          <label>
+                            <span>캡처 기준 검색어</span>
+                            <input
+                              value={captureQuery}
+                              onChange={(event) =>
+                                updateManualAutocompleteQuery(item, event.target.value)
+                              }
+                              placeholder={item.autocomplete.query || item.searchKeyword}
+                            />
+                          </label>
+                          <button
+                            className="button button--secondary manual-autocomplete-copy"
+                            type="button"
+                            onClick={() =>
+                              void copyText(
+                                captureQuery.trim() || item.autocomplete.query,
+                                `후보 ${item.rank}의 캡처 기준 검색어를 복사했습니다.`,
+                              )
+                            }
+                          >
+                            검색어 복사
+                          </button>
+                          <small>
+                            위 검색어를 네이버 검색창에 입력해 자동완성 목록 전체가 보이도록 캡처한 뒤, “ChatGPT용 전체 복사” 내용과 이미지를 함께 첨부하세요.
+                          </small>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="card-actions">
