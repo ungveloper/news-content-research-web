@@ -36,7 +36,18 @@ for (const heading of ["# 1. 게시용 본문", "# 2. 게시 전 확인 자료",
   }
 }
 
-for (const marker of ["NAVER 자동완성", "예비 AI 추천 점수", "예상 경쟁 위험", "대표 핵심 롱테일"]) {
+for (const marker of [
+  "NAVER 자동완성",
+  "예비 AI 추천 점수",
+  "예상 경쟁 위험",
+  "대표 핵심 롱테일",
+  "Google SEO 검증",
+  "Naver SEO 검증",
+  "AdSense 콘텐츠 가치",
+  "내부링크 계획",
+  "독자 가치 자산을 최소 2개",
+  "출판 SEO 점검",
+]) {
   if (!prompt.includes(marker)) {
     console.error(`심층 검증 프롬프트 누락: ${marker}`);
     process.exit(1);
@@ -50,6 +61,18 @@ const categoryIndex = prompt.indexOf("- **카테고리:**");
 if (!(scoreIndex < riskIndex && riskIndex < longtailIndex && longtailIndex < categoryIndex)) {
   console.error("최종 추천 카드의 핵심 정보 순서가 올바르지 않습니다.");
   process.exit(1);
+}
+
+
+const workbench = fs.readFileSync(
+  path.join(root, "components/news-research-workbench.tsx"),
+  "utf8",
+);
+for (const marker of ["DEFAULT_PROMPT_VERSION", "google-naver-adsense-v2"]) {
+  if (!workbench.includes(marker)) {
+    console.error(`프롬프트 버전 전환 로직 누락: ${marker}`);
+    process.exit(1);
+  }
 }
 
 const naverApi = fs.readFileSync(path.join(root, "lib/news/naver-api.ts"), "utf8");

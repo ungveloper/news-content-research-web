@@ -15,6 +15,8 @@ import type {
 } from "@/lib/types";
 
 const PROMPT_STORAGE_KEY = "news-content-research:prompt";
+const PROMPT_STORAGE_VERSION_KEY = "news-content-research:prompt-version";
+const DEFAULT_PROMPT_VERSION = "google-naver-adsense-v2";
 const EXISTING_CONTENT_STORAGE_KEY = "news-content-research:existing-content";
 const CATEGORY_STORAGE_KEY = "news-content-research:category";
 
@@ -84,11 +86,16 @@ export default function NewsResearchWorkbench() {
 
   useEffect(() => {
     const savedPrompt = window.localStorage.getItem(PROMPT_STORAGE_KEY);
+    const savedPromptVersion = window.localStorage.getItem(
+      PROMPT_STORAGE_VERSION_KEY,
+    );
     const savedExisting = window.localStorage.getItem(EXISTING_CONTENT_STORAGE_KEY);
     const savedCategory = window.localStorage.getItem(CATEGORY_STORAGE_KEY);
 
     const frameId = window.requestAnimationFrame(() => {
-      if (savedPrompt) setPrompt(savedPrompt);
+      if (savedPrompt && savedPromptVersion === DEFAULT_PROMPT_VERSION) {
+        setPrompt(savedPrompt);
+      }
       if (savedExisting) setExistingContentInventory(savedExisting);
       if (
         savedCategory === "all" ||
@@ -239,6 +246,10 @@ export default function NewsResearchWorkbench() {
   function saveSettings() {
     window.localStorage.setItem(PROMPT_STORAGE_KEY, prompt);
     window.localStorage.setItem(
+      PROMPT_STORAGE_VERSION_KEY,
+      DEFAULT_PROMPT_VERSION,
+    );
+    window.localStorage.setItem(
       EXISTING_CONTENT_STORAGE_KEY,
       existingContentInventory,
     );
@@ -253,7 +264,7 @@ export default function NewsResearchWorkbench() {
         <h1>뉴스가 검색어가 되기 전에,<br />다음 질문을 먼저 찾습니다.</h1>
         <p>
           NAVER 뉴스 확산 속도, Search Trend, 자동완성, 블로그 경쟁 신호를 여러 번 교차 확인해
-          네 개의 WordPress 카테고리에서 빠르게 발행할 만한 후속 검색 주제를 압축합니다.
+          네 개의 WordPress 카테고리에서 빠르게 발행할 만한 후속 검색 주제를 압축하고, ChatGPT 단계에서 Google SEO·Naver SEO·AdSense 콘텐츠 가치를 각각 다시 검증합니다.
         </p>
         <div className="hero__steps" aria-label="분석 흐름">
           <span><b>1</b> 뉴스 수집</span>
@@ -526,7 +537,7 @@ export default function NewsResearchWorkbench() {
               <div>
                 <span className="step">STEP 4</span>
                 <h2>ChatGPT Pro 심층 검증 패키지</h2>
-                <p>전체 후보와 사전 점수를 복사해 ChatGPT에서 다시 최신 웹 검색을 수행합니다. 후보 번호 선택 후에는 기존 ai-trends-editor와 동일한 4개 영역으로 완성 글을 출력하도록 고정했습니다.</p>
+                <p>전체 후보와 사전 점수를 복사해 ChatGPT에서 Google SEO·Naver SEO·AdSense 콘텐츠 가치를 각각 검증합니다. 후보 번호 선택 후에는 기존 ai-trends-editor와 동일한 4개 영역으로 완성 글을 출력합니다.</p>
               </div>
             </div>
 
@@ -538,7 +549,7 @@ export default function NewsResearchWorkbench() {
                 onChange={(event) => setExistingContentInventory(event.target.value)}
                 placeholder={"글 제목 | URL | 핵심 검색어 형식으로 한 줄씩 입력\n예: 서울교육청 9급 면접 일정 | https://example.com/post | 서울교육청 9급 면접"}
               />
-              <small>입력하면 같은 검색 의도의 신규 글을 피하고 업데이트·통합·보강 여부까지 판단합니다.</small>
+              <small>입력하면 같은 검색 의도의 신규 글을 피하고 업데이트·통합·보강 여부를 판단하며, URL이 있는 관련 글은 본문 내부링크 후보로도 활용합니다.</small>
             </label>
 
             <label className="editor-field">
@@ -560,7 +571,7 @@ export default function NewsResearchWorkbench() {
       ) : null}
 
       <footer className="footer-note">
-        <p>뉴스 기사 수와 검색 추세는 탐색 신호입니다. 최종 게시 전에는 ChatGPT 심층 검증 단계에서 공식 발표·시행일·검색 결과 경쟁·출처 독립성을 다시 확인하도록 설계했습니다.</p>
+        <p>뉴스 기사 수와 검색 추세는 탐색 신호입니다. 최종 게시 전에는 ChatGPT 심층 검증 단계에서 Google SEO·Naver SEO·독자 가치·내부링크·AdSense 정책 위험과 공식 출처를 다시 확인하도록 설계했습니다.</p>
       </footer>
     </main>
   );
