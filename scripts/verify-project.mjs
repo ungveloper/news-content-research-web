@@ -36,4 +36,26 @@ for (const heading of ["# 1. 게시용 본문", "# 2. 게시 전 확인 자료",
   }
 }
 
+for (const marker of ["NAVER 자동완성", "예비 AI 추천 점수", "예상 경쟁 위험", "대표 핵심 롱테일"]) {
+  if (!prompt.includes(marker)) {
+    console.error(`심층 검증 프롬프트 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+const scoreIndex = prompt.indexOf("- **예비 AI 추천 점수:**");
+const riskIndex = prompt.indexOf("- **예상 경쟁 위험:**");
+const longtailIndex = prompt.indexOf("- **대표 핵심 롱테일:**");
+const categoryIndex = prompt.indexOf("- **카테고리:**");
+if (!(scoreIndex < riskIndex && riskIndex < longtailIndex && longtailIndex < categoryIndex)) {
+  console.error("최종 추천 카드의 핵심 정보 순서가 올바르지 않습니다.");
+  process.exit(1);
+}
+
+const naverApi = fs.readFileSync(path.join(root, "lib/news/naver-api.ts"), "utf8");
+if (!naverApi.includes("ac.search.naver.com/nx/ac")) {
+  console.error("NAVER 자동완성 수집 로직이 누락되었습니다.");
+  process.exit(1);
+}
+
 console.log("news-content-research-web 구조 검증 완료");

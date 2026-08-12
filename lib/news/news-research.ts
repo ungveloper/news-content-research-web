@@ -6,6 +6,7 @@ import {
 } from "@/lib/categories";
 import {
   getNaverApiMode,
+  getNaverAutocompleteSuggestions,
   getNaverSearchTrends,
   searchNaverBlogs,
   searchNaverNews,
@@ -20,6 +21,7 @@ import {
   tokenize,
 } from "@/lib/news/scoring";
 import type {
+  AutocompleteSignal,
   CategorySelection,
   CompetitionSignal,
   NewsArticleSummary,
@@ -309,6 +311,17 @@ function toArticleSummary(article: CollectedArticle): NewsArticleSummary {
   };
 }
 
+function buildEmptyAutocomplete(
+  query: string,
+  status: "no-data" | "error" = "no-data",
+): AutocompleteSignal {
+  return {
+    status,
+    query,
+    suggestions: [],
+  };
+}
+
 function buildEmptyTrend(status: "no-data" | "error" = "no-data"): SearchTrendSignal {
   return {
     status,
@@ -385,6 +398,28 @@ async function enrichTrends(
   return map;
 }
 
+async function enrichAutocomplete(
+  opportunities: NewsOpportunity[],
+): Promise<Map<string, AutocompleteSignal>> {
+  const target = opportunities.slice(0, 30);
+  const map = new Map<string, AutocompleteSignal>();
+
+  await mapWithConcurrency(target, 3, async (item) => {
+    try {
+      const suggestions = await getNaverAutocompleteSuggestions(item.searchKeyword);
+      map.set(item.id, {
+        status: suggestions.length > 0 ? "ok" : "no-data",
+        query: item.searchKeyword,
+        suggestions,
+      });
+    } catch {
+      map.set(item.id, buildEmptyAutocomplete(item.searchKeyword, "error"));
+    }
+  });
+
+  return map;
+}
+
 async function enrichCompetition(
   opportunities: NewsOpportunity[],
 ): Promise<Map<string, CompetitionSignal>> {
@@ -419,6 +454,7 @@ function buildReasons(item: NewsOpportunity): string[] {
   if (item.last1HourCount >= 3) reasons.push(`최근 1시간 기사 ${item.last1HourCount}건으로 뉴스 공급 속도가 빠릅니다.`);
   if (item.independentPublisherCount >= 4) reasons.push(`서로 다른 도메인 ${item.independentPublisherCount}곳에서 다뤄 단일 매체 이슈보다 확산 신호가 강합니다.`);
   if (item.trend.status === "ok" && (item.trend.momentumPercent ?? 0) > 20) reasons.push(`Naver 검색 추세 최근 평균이 기준 구간보다 ${Math.round(item.trend.momentumPercent ?? 0)}% 높습니다.`);
+  if (item.autocomplete.status === "ok") reasons.push(`핵심 키워드 “${item.autocomplete.query}” 입력 시 Naver 자동완성 ${item.autocomplete.suggestions.length}개를 확보해 실제 검색 표현 후보로 사용할 수 있습니다.`);
   if (item.competition.status === "ok") reasons.push(`롱테일 힌트 기준 Naver 블로그 검색 경쟁 위험을 ${item.competition.riskLevel}(${item.competition.riskScore}/100)으로 사전 추정했습니다.`);
   reasons.push(`뉴스 자체 요약보다 “${item.secondQuestion}”라는 후속 검색 의도로 전환할 수 있습니다.`);
   return reasons.slice(0, 5);
@@ -528,6 +564,7 @@ export async function collectNewsOpportunities(input: {
         searchKeyword: topic,
         longtailHint: derived.longtailHint,
         secondQuestion: derived.secondQuestion,
+        autocomplete: buildEmptyAutocomplete(topic),
         matchedSeeds,
         articleCount: sorted.length,
         independentPublisherCount: publisherCount,
@@ -558,6 +595,13 @@ export async function collectNewsOpportunities(input: {
   candidates = candidates.map((item) => ({
     ...item,
     trend: trendMap.get(item.id) ?? buildEmptyTrend(),
+  }));
+
+  const autocompleteMap = await enrichAutocomplete(candidates);
+  candidates = candidates.map((item) => ({
+    ...item,
+    autocomplete:
+      autocompleteMap.get(item.id) ?? buildEmptyAutocomplete(item.searchKeyword),
   }));
 
   const competitionMap = await enrichCompetition(candidates);
@@ -606,6 +650,14 @@ export async function collectNewsOpportunities(input: {
   if (failedSeedCount > 0) {
     warnings.push("일부 시드 검색이 실패해 해당 시드는 점수 계산에서 제외했습니다.");
   }
+  if (
+    candidates.length > 0 &&
+    candidates.every((item) => item.autocomplete.status !== "ok")
+  ) {
+    warnings.push(
+      "NAVER 자동완성 보조 신호를 확보하지 못했습니다. 자동완성은 비공식 보조 수집이므로 뉴스·Trend·블로그 검증은 그대로 유지됩니다.",
+    );
+  }
 
   const categoryLabel =
     input.categorySelection === "all"
@@ -627,6 +679,7 @@ export async function collectNewsOpportunities(input: {
       clusterCount: clusters.length,
       trendValidatedCount: candidates.filter((item) => item.trend.status === "ok").length,
       competitionValidatedCount: candidates.filter((item) => item.competition.status === "ok").length,
+      autocompleteValidatedCount: candidates.filter((item) => item.autocomplete.status === "ok").length,
       apiMode: getNaverApiMode(),
       windowHours,
     },

@@ -22,6 +22,7 @@ export const DEFAULT_NEWS_RESEARCH_PROMPT = `당신은 최신 뉴스 신호에�
 3. NAVER 검색어 트렌드 비율은 절대 검색량이 아니라 상대값이다. 정확한 월간 검색량을 확보하지 못하면 숫자를 추정하지 않는다.
 4. 뉴스 기사는 같은 보도자료를 받아쓴 여러 매체가 포함될 수 있으므로 독립 출처 수를 기사 건수와 동일하게 보지 않는다.
 5. 제공된 “롱테일 힌트”와 “다음 검색 질문”은 규칙 기반 초안이다. 실제 검색 표현과 검색 의도가 더 자연스러운 방향으로 확인되면 수정할 수 있다.
+6. “NAVER 자동완성”은 뉴스 헤드라인에서 코드가 사전 추출한 핵심 키워드를 실제 검색창 자동완성 요청에 넣어 얻은 보조 신호다. 자동완성어는 검색량이나 순위를 뜻하지 않으며, 표현·검색 의도 후보로만 사용한다. 자동완성 데이터가 없거나 실패해도 후보 자체를 자동 탈락시키지 않는다.
 
 ## 1단계: 최종 후보 검증
 1. 예비 점수 상위 후보부터 보되 점수만으로 선정하지 않는다.
@@ -29,6 +30,7 @@ export const DEFAULT_NEWS_RESEARCH_PROMPT = `당신은 최신 뉴스 신호에�
 3. 같은 사건을 가리키는 후보는 검색 의도가 같으면 하나로 합친다.
 4. 최신 Google·Naver 검색 결과를 확인해 다음을 검증한다.
    - 사용자가 실제로 입력할 대표 롱테일 검색 표현
+   - 제공된 NAVER 자동완성어 중 현재 검색 의도와 실제로 일치하는 표현
    - 검색 결과 상위 문서의 유형과 최신성
    - 뉴스 요약 외에 독립 콘텐츠가 클릭받을 공간
    - 기존 글에서 빠진 조건·비교·타임라인·체크리스트 등 콘텐츠 공백
@@ -46,13 +48,14 @@ export const DEFAULT_NEWS_RESEARCH_PROMPT = `당신은 최신 뉴스 신호에�
 AI 추천 점수는 최종 검증을 반영해 다시 산정할 수 있지만, 실제 성공 확률이나 절대 검색량이 아니라 후보 간 우선순위 비교값임을 한 문장으로 먼저 밝힌다.
 
 ### 1. 추천 제목
+- **예비 AI 추천 점수:** **00/100**
+- **예상 경쟁 위험:** **낮음/보통 (00/100)**
+- **대표 핵심 롱테일:** **검색자가 실제 입력할 표현 1개**
 - **카테고리:** 정확한 카테고리명 1개
 - **후보 출처:** 뉴스 조기 신호
+- **NAVER 자동완성 근거:** 제공된 자동완성어 중 대표 롱테일 판단에 실제로 도움이 된 표현. 없으면 “유효 신호 없음”
 - **뉴스 확산 신호:** 최근 기사 수·독립 매체 수·확산 단계
 - **검색 관심 신호:** 확인된 검색 추세와 해석
-- **예비 AI 추천 점수:** 00/100
-- **예상 경쟁 위험:** 낮음/보통 (00/100)
-- **대표 핵심 롱테일:** 검색자가 실제 입력할 표현 1개
 - **보조 검색 표현:** 필요할 때 최대 2개
 - **다음 검색 질문:** 이 글이 가장 먼저 답할 질문 1개
 - **콘텐츠 공백:** 기존 검색 결과에서 부족한 정보
@@ -174,6 +177,12 @@ function formatCategoryPolicy(selection: CategorySelection): string {
   ].join("\n");
 }
 
+function formatAutocomplete(item: NewsOpportunity): string {
+  if (item.autocomplete.status === "error") return "수집 실패";
+  if (item.autocomplete.suggestions.length === 0) return "자동완성 결과 없음";
+  return item.autocomplete.suggestions.join(" | ");
+}
+
 function formatOpportunity(item: NewsOpportunity): string {
   const articleLines = item.articles
     .slice(0, 6)
@@ -185,14 +194,17 @@ function formatOpportunity(item: NewsOpportunity): string {
 
   return [
     `## 후보 ${item.rank}. ${item.representativeTitle}`,
+    `- 예비 AI 추천 점수: ${item.preliminaryAiScore}/100`,
+    `- 예상 경쟁 위험: ${item.competition.riskLevel} (${item.competition.riskScore}/100)`,
+    `- 대표 핵심 롱테일 사전 힌트: ${item.longtailHint}`,
     `- 카테고리: ${item.categoryLabel}`,
+    `- 후보 출처: 뉴스 조기 신호`,
+    `- 뉴스 헤드라인 핵심 키워드: ${item.autocomplete.query}`,
+    `- NAVER 자동완성: ${formatAutocomplete(item)}`,
     `- 사전 추출 주제: ${item.topic}`,
     `- 검색어 트렌드 확인용 키워드: ${item.searchKeyword}`,
-    `- 롱테일 힌트: ${item.longtailHint}`,
     `- 다음 검색 질문: ${item.secondQuestion}`,
-    `- 예비 AI 추천 점수: ${item.preliminaryAiScore}/100`,
     `- 점수 세부: 뉴스속도 ${item.scoreBreakdown.newsVelocity}/20 | 검색관심 ${item.scoreBreakdown.searchInterest}/20 | 카테고리적합 ${item.scoreBreakdown.categoryFit}/15 | 후속질문 ${item.scoreBreakdown.secondQuestionClarity}/20 | 검증용이성 ${item.scoreBreakdown.verificationEase}/10 | 콘텐츠공백 ${item.scoreBreakdown.contentGap}/10 | 타이밍 ${item.scoreBreakdown.timing}/5`,
-    `- 예상 경쟁 위험: ${item.competition.riskLevel} (${item.competition.riskScore}/100)`,
     `- Naver 블로그 검색 결과량: ${formatNumber(item.competition.blogResultTotal)}`,
     `- 상위 10개 중 유사 제목 수: ${formatNumber(item.competition.similarTopResultCount)}`,
     `- 뉴스 확산: ${item.newsVelocityLabel} | 전체 ${item.articleCount}건 | 최근 1시간 ${item.last1HourCount}건 | 최근 3시간 ${item.last3HourCount}건 | 독립 도메인 ${item.independentPublisherCount}곳`,
@@ -228,7 +240,8 @@ export function buildNewsResearchPackage(input: {
     `- 사건 군집: ${feed.summary.clusterCount}개`,
     `- Search Trend 검증 성공 후보: ${feed.summary.trendValidatedCount}/${feed.opportunities.length}`,
     `- Naver 블로그 경쟁 사전검증 성공 후보: ${feed.summary.competitionValidatedCount}/${feed.opportunities.length}`,
-    "- 주의: 뉴스 군집·롱테일·예비 점수·경쟁 위험은 코드 기반 사전 압축값이며 최종 사실·SEO 판단은 반드시 최신 웹 검색으로 다시 검증할 것",
+    `- Naver 자동완성 확보 후보: ${feed.summary.autocompleteValidatedCount}/${feed.opportunities.length}`,
+    "- 주의: 뉴스 군집·롱테일·예비 점수·경쟁 위험·자동완성은 코드 기반 사전 압축 신호이며 최종 사실·SEO 판단은 반드시 최신 웹 검색으로 다시 검증할 것",
     feed.warnings.length > 0 ? `- 수집 경고: ${feed.warnings.join(" / ")}` : "- 수집 경고: 없음",
     "",
     "# 기존 발행 콘텐츠",

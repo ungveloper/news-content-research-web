@@ -135,7 +135,7 @@ export default function NewsResearchWorkbench() {
       const result = await parseResponse(response);
       setFeed(result);
       setNotice(
-        `${result.summary.recentArticleCount.toLocaleString("ko-KR")}건의 최근 뉴스를 ${result.summary.clusterCount.toLocaleString("ko-KR")}개 사건 묶음으로 압축한 뒤 Search Trend와 블로그 경쟁 신호를 교차 확인했습니다.`,
+        `${result.summary.recentArticleCount.toLocaleString("ko-KR")}건의 최근 뉴스를 ${result.summary.clusterCount.toLocaleString("ko-KR")}개 사건 묶음으로 압축한 뒤 Search Trend, Naver 자동완성, 블로그 경쟁 신호를 교차 확인했습니다.`,
       );
     } catch (caught) {
       setError(
@@ -178,7 +178,7 @@ export default function NewsResearchWorkbench() {
         <div className="hero__eyebrow">NEWS CONTENT RESEARCH</div>
         <h1>뉴스가 검색어가 되기 전에,<br />다음 질문을 먼저 찾습니다.</h1>
         <p>
-          NAVER 뉴스 확산 속도, Search Trend, 블로그 경쟁 신호를 여러 번 교차 확인해
+          NAVER 뉴스 확산 속도, Search Trend, 자동완성, 블로그 경쟁 신호를 여러 번 교차 확인해
           네 개의 WordPress 카테고리에서 빠르게 발행할 만한 후속 검색 주제를 압축합니다.
         </p>
         <div className="hero__steps" aria-label="분석 흐름">
@@ -263,7 +263,7 @@ export default function NewsResearchWorkbench() {
         <section className="panel loading-panel">
           <div className="loading-spinner" />
           <strong>뉴스를 사건 단위로 묶고 교차 검증하고 있습니다.</strong>
-          <span>뉴스 검색 → Search Trend → 블로그 경쟁 사전검증 순서로 진행됩니다.</span>
+          <span>뉴스 검색 → Search Trend → Naver 자동완성 → 블로그 경쟁 사전검증 순서로 진행됩니다.</span>
         </section>
       ) : null}
 
@@ -283,6 +283,7 @@ export default function NewsResearchWorkbench() {
               <div><span>사건 묶음</span><strong>{feed.summary.clusterCount.toLocaleString("ko-KR")}</strong></div>
               <div><span>Trend 검증</span><strong>{feed.summary.trendValidatedCount}/{feed.opportunities.length}</strong></div>
               <div><span>경쟁 검증</span><strong>{feed.summary.competitionValidatedCount}/{feed.opportunities.length}</strong></div>
+              <div><span>자동완성</span><strong>{feed.summary.autocompleteValidatedCount}/{feed.opportunities.length}</strong></div>
             </div>
             {feed.warnings.length > 0 ? (
               <details className="warning-details">
@@ -391,6 +392,19 @@ export default function NewsResearchWorkbench() {
                         <div>
                           <h4>사전 판정 근거</h4>
                           <ul>{item.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+                        </div>
+                        <div className="autocomplete-details">
+                          <h4>Naver 자동완성</h4>
+                          <p>헤드라인 사전 추출 핵심 키워드 <b>{item.autocomplete.query}</b></p>
+                          {item.autocomplete.suggestions.length > 0 ? (
+                            <div className="autocomplete-tags">
+                              {item.autocomplete.suggestions.map((suggestion) => (
+                                <span key={suggestion}>{suggestion}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <small>{item.autocomplete.status === "error" ? "자동완성 수집에 실패했습니다. 최종 검증에서 직접 확인합니다." : "현재 자동완성 결과가 없습니다."}</small>
+                          )}
                         </div>
                         <div className="source-list">
                           <h4>같은 사건으로 묶인 기사</h4>

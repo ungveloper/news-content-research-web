@@ -189,3 +189,63 @@ export async function getNaverSearchTrends(input: {
     }),
   });
 }
+
+export async function getNaverAutocompleteSuggestions(
+  query: string,
+): Promise<string[]> {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) return [];
+
+  const url = new URL("https://ac.search.naver.com/nx/ac");
+  url.searchParams.set("q", normalizedQuery);
+  url.searchParams.set("con", "1");
+  url.searchParams.set("frm", "nx");
+  url.searchParams.set("ans", "2");
+  url.searchParams.set("r_format", "json");
+  url.searchParams.set("r_enc", "UTF-8");
+  url.searchParams.set("r_unicode", "0");
+  url.searchParams.set("t_koreng", "1");
+  url.searchParams.set("run", "2");
+  url.searchParams.set("rev", "4");
+  url.searchParams.set("q_enc", "UTF-8");
+  url.searchParams.set("st", "100");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json,text/plain,*/*",
+        Referer: "https://search.naver.com/",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`NAVER 자동완성 요청 실패 (${response.status})`);
+    }
+
+    const payload = (await response.json()) as unknown;
+    if (!payload || typeof payload !== "object" || !("items" in payload)) return [];
+
+    const groups = (payload as { items?: unknown }).items;
+    if (!Array.isArray(groups)) return [];
+
+    const suggestions: string[] = [];
+    for (const group of groups) {
+      if (!Array.isArray(group)) continue;
+      for (const entry of group) {
+        if (!Array.isArray(entry) || typeof entry[0] !== "string") continue;
+        const value = entry[0].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        if (value && !suggestions.includes(value)) suggestions.push(value);
+      }
+    }
+
+    return suggestions;
+  } finally {
+    clearTimeout(timeout);
+  }
+}

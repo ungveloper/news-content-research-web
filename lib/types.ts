@@ -24,6 +24,12 @@ export type SearchTrendSignal = {
   periodEnd: string | null;
 };
 
+export type AutocompleteSignal = {
+  status: "ok" | "no-data" | "error";
+  query: string;
+  suggestions: string[];
+};
+
 export type CompetitionSignal = {
   status: "ok" | "error" | "not-checked";
   query: string;
@@ -54,6 +60,7 @@ export type NewsOpportunity = {
   searchKeyword: string;
   longtailHint: string;
   secondQuestion: string;
+  autocomplete: AutocompleteSignal;
   matchedSeeds: string[];
   articleCount: number;
   independentPublisherCount: number;
@@ -83,6 +90,7 @@ export type NewsResearchSummary = {
   clusterCount: number;
   trendValidatedCount: number;
   competitionValidatedCount: number;
+  autocompleteValidatedCount: number;
   apiMode: "hub" | "legacy";
   windowHours: number;
 };
