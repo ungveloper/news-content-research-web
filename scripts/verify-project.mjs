@@ -48,7 +48,9 @@ for (const marker of [
   "독자 가치 자산을 최소 2개",
   "출판 SEO 점검",
   "자동완성 캡처 정밀검증",
-  "번호 선택 후 추가 여부 확인",
+  "자동완성 캡처 권장도",
+  "추가 정밀검증 필요성 낮음/보통으로 생략",
+  "처음으로 관련 자동완성이 나타나는 단계",
   "제안어 미확보 (검색 수요 없음 의미 아님)",
 ]) {
   if (!prompt.includes(marker)) {
@@ -73,7 +75,7 @@ const workbench = fs.readFileSync(
 );
 for (const marker of [
   "DEFAULT_PROMPT_VERSION",
-  "google-naver-adsense-interactive-autocomplete-v4",
+  "google-naver-adsense-conditional-autocomplete-v5",
   "최근 10분 (기본 · 초고속 탐지)",
   "copyResearchPackage(result, true)",
 ]) {

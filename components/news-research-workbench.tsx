@@ -16,7 +16,7 @@ import type {
 
 const PROMPT_STORAGE_KEY = "news-content-research:prompt";
 const PROMPT_STORAGE_VERSION_KEY = "news-content-research:prompt-version";
-const DEFAULT_PROMPT_VERSION = "google-naver-adsense-interactive-autocomplete-v4";
+const DEFAULT_PROMPT_VERSION = "google-naver-adsense-conditional-autocomplete-v5";
 const EXISTING_CONTENT_STORAGE_KEY = "news-content-research:existing-content";
 const CATEGORY_STORAGE_KEY = "news-content-research:category";
 
