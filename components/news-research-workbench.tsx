@@ -301,6 +301,26 @@ export default function NewsResearchWorkbench() {
               </div>
             </div>
 
+            <div className="opportunity-copy-row">
+              <div>
+                <strong>후보 {feed.opportunities.length}개 전체를 ChatGPT Pro에서 재검증</strong>
+                <span>아래 목록을 끝까지 확인하지 않아도 현재 수집된 전체 후보와 검증 프롬프트가 함께 복사됩니다.</span>
+              </div>
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={!researchPackage}
+                onClick={() =>
+                  void copyText(
+                    researchPackage,
+                    `ChatGPT용 전체 패키지와 후보 ${feed.opportunities.length}개를 복사했습니다.`,
+                  )
+                }
+              >
+                ChatGPT용 전체 복사
+              </button>
+            </div>
+
             <div className="opportunity-list">
               {feed.opportunities.map((item) => {
                 const expanded = expandedId === item.id;
@@ -417,7 +437,6 @@ export default function NewsResearchWorkbench() {
 
             <div className="action-row">
               <button className="button button--secondary" type="button" onClick={saveSettings}>프롬프트·설정 저장</button>
-              <button className="button button--primary" type="button" disabled={!researchPackage} onClick={() => void copyText(researchPackage, `ChatGPT용 전체 패키지와 후보 ${feed.opportunities.length}개를 복사했습니다.`)}>ChatGPT용 전체 복사</button>
               <button className="button button--secondary" type="button" disabled={feed.opportunities.length === 0} onClick={() => void copyText(JSON.stringify(feed.opportunities, null, 2), "후보 JSON을 복사했습니다.")}>후보 JSON 복사</button>
             </div>
 
