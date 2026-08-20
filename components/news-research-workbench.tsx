@@ -134,7 +134,9 @@ export default function NewsResearchWorkbench() {
       });
       const result = await parseResponse(response);
       setFeed(result);
-      await copyResearchPackage(result, true);
+      setNotice(
+        `${result.summary.recentArticleCount.toLocaleString("ko-KR")}건의 탐지 범위 뉴스를 ${result.summary.clusterCount.toLocaleString("ko-KR")}개 사건 묶음으로 압축·교차 검증했습니다. 아래 카테고리별 버튼을 눌러 필요한 ChatGPT 프롬프트를 직접 복사해 주세요.`,
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -168,7 +170,6 @@ export default function NewsResearchWorkbench() {
 
   async function copyResearchPackage(
     targetFeed: NewsResearchResponse | null = feed,
-    automatic = false,
     groupId: string | null = null,
   ) {
     if (!targetFeed || copyingPackage) return;
@@ -213,9 +214,7 @@ export default function NewsResearchWorkbench() {
       }
 
       setCopyProgress(75);
-      setCopyStatus(automatic
-        ? "3/4 · 전체 수집 완료 · 클립보드 자동 복사 중"
-        : `3/4 · ${scopeLabel} 프롬프트를 클립보드에 복사 중`);
+      setCopyStatus(`3/4 · ${scopeLabel} 프롬프트를 클립보드에 복사 중`);
       await waitForPaint();
 
       await navigator.clipboard.writeText(packageText);
@@ -225,9 +224,7 @@ export default function NewsResearchWorkbench() {
         `4/4 · ${scopeLabel} 복사 완료 · ${packageText.length.toLocaleString("ko-KR")}자`,
       );
       setNotice(
-        automatic
-          ? `${targetFeed.summary.recentArticleCount.toLocaleString("ko-KR")}건의 탐지 범위 뉴스를 ${targetFeed.summary.clusterCount.toLocaleString("ko-KR")}개 사건 묶음으로 압축·교차 검증했고, 전체 통합 ChatGPT 프롬프트까지 자동 복사했습니다. 이제 아래 카테고리 버튼을 누르면 해당 후보만 즉시 다시 복사할 수 있습니다.`
-          : `${scopeLabel} 후보 ${opportunityCount}개가 포함된 ChatGPT 프롬프트를 복사했습니다.`,
+        `${scopeLabel} 후보 ${opportunityCount}개가 포함된 ChatGPT 프롬프트를 복사했습니다.`,
       );
     } catch (caught) {
       const knownMessage =
@@ -237,14 +234,10 @@ export default function NewsResearchWorkbench() {
           ? caught.message
           : null;
 
-      if (automatic) {
-        setNotice(
-          `${targetFeed.summary.recentArticleCount.toLocaleString("ko-KR")}건의 뉴스 수집·검증은 완료됐습니다. 다만 브라우저 보안 정책으로 자동 클립보드 복사가 허용되지 않았습니다. 아래 “전체 통합” 버튼을 한 번 눌러 주세요.`,
-        );
-        if (knownMessage) setError(knownMessage);
-      } else {
-        setError(knownMessage ?? "클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.");
-      }
+      setError(
+        knownMessage ??
+          "클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.",
+      );
       setCopyingPackage(false);
       setCopyingGroupId(null);
       setCopyProgress(0);
@@ -347,7 +340,7 @@ export default function NewsResearchWorkbench() {
         </div>
 
         <p className="filter-help">
-          최근 뉴스 범위는 “새 신호 탐지 범위”입니다. 10분을 선택해도 확산 점수는 최근 3시간 맥락을 함께 확인합니다. 기본 4개 카테고리는 항상 모두 조회하며, 확장 추천은 더 엄격한 검색 기회 게이트를 통과한 경우에만 추가됩니다. 수집이 끝나면 전체 통합 ChatGPT 프롬프트 자동 복사를 시도합니다.
+          최근 뉴스 범위는 “새 신호 탐지 범위”입니다. 10분을 선택해도 확산 점수는 최근 3시간 맥락을 함께 확인합니다. 기본 4개 카테고리는 항상 모두 조회하며, 확장 추천은 더 엄격한 검색 기회 게이트를 통과한 경우에만 추가됩니다. 수집 완료 후 원하는 카테고리의 프롬프트 복사 버튼을 직접 눌러 ChatGPT Pro에 전달할 수 있습니다.
         </p>
         {error ? <div className="notice notice--error">{error}</div> : null}
         {notice ? <div className="notice notice--success">{notice}</div> : null}
@@ -413,7 +406,7 @@ export default function NewsResearchWorkbench() {
                   type="button"
                   className="prompt-group-card prompt-group-card--all"
                   disabled={feed.opportunities.length === 0 || copyingPackage}
-                  onClick={() => void copyResearchPackage(feed, false, null)}
+                  onClick={() => void copyResearchPackage(feed, null)}
                 >
                   <span className="prompt-group-card__meta">전체 통합</span>
                   <strong>모든 카테고리 한 번에 복사</strong>
@@ -434,7 +427,7 @@ export default function NewsResearchWorkbench() {
                     className={`prompt-group-card${group.temporary ? " prompt-group-card--temporary" : ""}`}
                     key={group.id}
                     disabled={group.opportunityIds.length === 0 || copyingPackage}
-                    onClick={() => void copyResearchPackage(feed, false, group.id)}
+                    onClick={() => void copyResearchPackage(feed, group.id)}
                   >
                     <span className="prompt-group-card__meta">
                       {group.temporary ? "임시 확장 추천" : "기본 카테고리"}

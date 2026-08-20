@@ -89,14 +89,20 @@ for (const marker of [
   "DEFAULT_PROMPT_VERSION",
   "all-category-grouped-prompts-v7",
   "최근 10분 (기본 · 초고속 탐지)",
-  "copyResearchPackage(result, true)",
+  "아래 카테고리별 버튼을 눌러 필요한 ChatGPT 프롬프트를 직접 복사해 주세요.",
   "prompt-group-grid",
   "기본 4개 카테고리는 항상 모두 조회",
 ]) {
   if (!workbench.includes(marker)) {
-    console.error(`10분 탐지·자동 복사 로직 누락: ${marker}`);
+    console.error(`10분 탐지·수동 복사 로직 누락: ${marker}`);
     process.exit(1);
   }
+}
+
+
+if (workbench.includes("copyResearchPackage(result, true)")) {
+  console.error("수집 완료 후 자동 클립보드 복사 호출이 남아 있습니다.");
+  process.exit(1);
 }
 
 const newsResearch = fs.readFileSync(path.join(root, "lib/news/news-research.ts"), "utf8");
