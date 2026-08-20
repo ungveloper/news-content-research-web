@@ -8,7 +8,6 @@ import {
   DEFAULT_NEWS_RESEARCH_PROMPT,
 } from "@/lib/research-package";
 import type {
-  CategorySelection,
   NewsOpportunity,
   NewsResearchErrorResponse,
   NewsResearchResponse,
@@ -16,9 +15,8 @@ import type {
 
 const PROMPT_STORAGE_KEY = "news-content-research:prompt";
 const PROMPT_STORAGE_VERSION_KEY = "news-content-research:prompt-version";
-const DEFAULT_PROMPT_VERSION = "google-naver-adsense-search-opportunity-v6";
+const DEFAULT_PROMPT_VERSION = "all-category-grouped-prompts-v7";
 const EXISTING_CONTENT_STORAGE_KEY = "news-content-research:existing-content";
-const CATEGORY_STORAGE_KEY = "news-content-research:category";
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("ko-KR", {
@@ -69,8 +67,6 @@ function ScoreBar({ item }: { item: NewsOpportunity }) {
 
 export default function NewsResearchWorkbench() {
   const [feed, setFeed] = useState<NewsResearchResponse | null>(null);
-  const [categorySelection, setCategorySelection] =
-    useState<CategorySelection>("all");
   const [windowHours, setWindowHours] = useState(1 / 6);
   const [maxResults, setMaxResults] = useState(20);
   const [customSeedText, setCustomSeedText] = useState("");
@@ -81,6 +77,7 @@ export default function NewsResearchWorkbench() {
   const [notice, setNotice] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copyingPackage, setCopyingPackage] = useState(false);
+  const [copyingGroupId, setCopyingGroupId] = useState<string | null>(null);
   const [copyProgress, setCopyProgress] = useState(0);
   const [copyStatus, setCopyStatus] = useState("");
 
@@ -90,19 +87,12 @@ export default function NewsResearchWorkbench() {
       PROMPT_STORAGE_VERSION_KEY,
     );
     const savedExisting = window.localStorage.getItem(EXISTING_CONTENT_STORAGE_KEY);
-    const savedCategory = window.localStorage.getItem(CATEGORY_STORAGE_KEY);
 
     const frameId = window.requestAnimationFrame(() => {
       if (savedPrompt && savedPromptVersion === DEFAULT_PROMPT_VERSION) {
         setPrompt(savedPrompt);
       }
       if (savedExisting) setExistingContentInventory(savedExisting);
-      if (
-        savedCategory === "all" ||
-        BLOG_CATEGORIES.some((category) => category.id === savedCategory)
-      ) {
-        setCategorySelection(savedCategory as CategorySelection);
-      }
     });
 
     return () => window.cancelAnimationFrame(frameId);
@@ -136,7 +126,7 @@ export default function NewsResearchWorkbench() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          categorySelection,
+          categorySelection: "all",
           windowHours,
           maxResults,
           customSeeds,
@@ -179,30 +169,43 @@ export default function NewsResearchWorkbench() {
   async function copyResearchPackage(
     targetFeed: NewsResearchResponse | null = feed,
     automatic = false,
+    groupId: string | null = null,
   ) {
     if (!targetFeed || copyingPackage) return;
 
+    const group = groupId
+      ? targetFeed.groups.find((entry) => entry.id === groupId)
+      : null;
+    const opportunityCount = group
+      ? group.opportunityIds.length
+      : targetFeed.opportunities.length;
+    const scopeLabel = group
+      ? `${group.temporary ? "임시 확장 추천 · " : ""}${group.label}`
+      : "전체 통합";
+
     setCopyingPackage(true);
+    setCopyingGroupId(groupId ?? "all");
     setCopyProgress(25);
-    setCopyStatus(`1/4 · 후보 ${targetFeed.opportunities.length}개 확인 중`);
+    setCopyStatus(`1/4 · ${scopeLabel} 후보 ${opportunityCount}개 확인 중`);
     setError("");
     setNotice("");
 
     try {
       await waitForPaint();
 
-      if (targetFeed.opportunities.length === 0) {
+      if (opportunityCount === 0) {
         throw new Error("복사할 뉴스 후보가 없습니다.");
       }
 
       setCopyProgress(50);
-      setCopyStatus("2/4 · ChatGPT 심층 검증 프롬프트 생성 중");
+      setCopyStatus(`2/4 · ${scopeLabel} ChatGPT 심층 검증 프롬프트 생성 중`);
       await waitForPaint();
 
       const packageText = buildNewsResearchPackage({
         feed: targetFeed,
         prompt,
         existingContentInventory,
+        groupId,
       });
 
       if (!packageText.trim()) {
@@ -211,20 +214,20 @@ export default function NewsResearchWorkbench() {
 
       setCopyProgress(75);
       setCopyStatus(automatic
-        ? "3/4 · 수집 완료 · 클립보드 자동 복사 중"
-        : "3/4 · 클립보드에 전체 패키지 복사 중");
+        ? "3/4 · 전체 수집 완료 · 클립보드 자동 복사 중"
+        : `3/4 · ${scopeLabel} 프롬프트를 클립보드에 복사 중`);
       await waitForPaint();
 
       await navigator.clipboard.writeText(packageText);
 
       setCopyProgress(100);
       setCopyStatus(
-        `4/4 · 복사 완료 · ${packageText.length.toLocaleString("ko-KR")}자`,
+        `4/4 · ${scopeLabel} 복사 완료 · ${packageText.length.toLocaleString("ko-KR")}자`,
       );
       setNotice(
         automatic
-          ? `${targetFeed.summary.recentArticleCount.toLocaleString("ko-KR")}건의 탐지 범위 뉴스를 ${targetFeed.summary.clusterCount.toLocaleString("ko-KR")}개 사건 묶음으로 압축·교차 검증했고, ChatGPT용 전체 프롬프트까지 자동 복사했습니다.`
-          : `ChatGPT용 전체 패키지와 후보 ${targetFeed.opportunities.length}개를 복사했습니다.`,
+          ? `${targetFeed.summary.recentArticleCount.toLocaleString("ko-KR")}건의 탐지 범위 뉴스를 ${targetFeed.summary.clusterCount.toLocaleString("ko-KR")}개 사건 묶음으로 압축·교차 검증했고, 전체 통합 ChatGPT 프롬프트까지 자동 복사했습니다. 이제 아래 카테고리 버튼을 누르면 해당 후보만 즉시 다시 복사할 수 있습니다.`
+          : `${scopeLabel} 후보 ${opportunityCount}개가 포함된 ChatGPT 프롬프트를 복사했습니다.`,
       );
     } catch (caught) {
       const knownMessage =
@@ -236,19 +239,21 @@ export default function NewsResearchWorkbench() {
 
       if (automatic) {
         setNotice(
-          `${targetFeed.summary.recentArticleCount.toLocaleString("ko-KR")}건의 뉴스 수집·검증은 완료됐습니다. 다만 브라우저 보안 정책으로 자동 클립보드 복사가 허용되지 않았습니다. 상단의 “ChatGPT용 전체 복사” 버튼을 한 번 눌러 주세요.`,
+          `${targetFeed.summary.recentArticleCount.toLocaleString("ko-KR")}건의 뉴스 수집·검증은 완료됐습니다. 다만 브라우저 보안 정책으로 자동 클립보드 복사가 허용되지 않았습니다. 아래 “전체 통합” 버튼을 한 번 눌러 주세요.`,
         );
         if (knownMessage) setError(knownMessage);
       } else {
         setError(knownMessage ?? "클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.");
       }
       setCopyingPackage(false);
+      setCopyingGroupId(null);
       setCopyProgress(0);
       setCopyStatus("");
       return;
     } finally {
       window.setTimeout(() => {
         setCopyingPackage(false);
+        setCopyingGroupId(null);
         setCopyProgress(0);
         setCopyStatus("");
       }, 1400);
@@ -265,8 +270,7 @@ export default function NewsResearchWorkbench() {
       EXISTING_CONTENT_STORAGE_KEY,
       existingContentInventory,
     );
-    window.localStorage.setItem(CATEGORY_STORAGE_KEY, categorySelection);
-    setNotice("프롬프트, 기존 글 목록, 선택 카테고리를 현재 브라우저에 저장했습니다.");
+    setNotice("프롬프트와 기존 글 목록을 현재 브라우저에 저장했습니다.");
   }
 
   return (
@@ -291,29 +295,19 @@ export default function NewsResearchWorkbench() {
           <div>
             <span className="step">STEP 1</span>
             <h2>뉴스 기회 탐색 조건</h2>
-            <p>전체 카테고리를 한 번에 훑거나 특정 카테고리만 집중해서 볼 수 있습니다.</p>
+            <p>버튼 한 번으로 기본 4개 카테고리를 모두 조회하고, 별도 확장 시드에서도 글쓰기 기회가 강한 주제를 추가 탐색합니다.</p>
           </div>
         </div>
 
-        <div className="category-grid">
-          <button
-            type="button"
-            className={`category-card${categorySelection === "all" ? " selected" : ""}`}
-            onClick={() => setCategorySelection("all")}
-          >
-            <strong>전체 4개 카테고리</strong>
-            <span>IT·AI · 경제·재테크·투자 · 생활·실용정보 · 취업·자격증·직무</span>
-          </button>
+        <div className="category-grid" aria-label="자동 탐색 대상 카테고리">
           {BLOG_CATEGORIES.map((category) => (
-            <button
-              type="button"
-              key={category.id}
-              className={`category-card${categorySelection === category.id ? " selected" : ""}`}
-              onClick={() => setCategorySelection(category.id)}
-            >
-              <strong>{category.label}</strong>
+            <div className="category-card category-card--static" key={category.id}>
+              <div className="category-card__label">
+                <strong>{category.label}</strong>
+                <span className="auto-search-badge">자동 조회</span>
+              </div>
               <span>{category.description}</span>
-            </button>
+            </div>
           ))}
         </div>
 
@@ -332,7 +326,7 @@ export default function NewsResearchWorkbench() {
             </select>
           </label>
           <label>
-            <span>표시 후보 수</span>
+            <span>기본 4개 표시 후보 기준</span>
             <select value={maxResults} onChange={(event) => setMaxResults(Number(event.target.value))}>
               <option value={10}>10개</option>
               <option value={20}>20개</option>
@@ -353,7 +347,7 @@ export default function NewsResearchWorkbench() {
         </div>
 
         <p className="filter-help">
-          선택 범위는 “새 신호 탐지 범위”입니다. 10분을 선택해도 확산 점수는 최근 3시간 맥락을 함께 확인합니다. 수집이 끝나면 ChatGPT용 전체 프롬프트 자동 복사를 시도합니다.
+          최근 뉴스 범위는 “새 신호 탐지 범위”입니다. 10분을 선택해도 확산 점수는 최근 3시간 맥락을 함께 확인합니다. 기본 4개 카테고리는 항상 모두 조회하며, 확장 추천은 더 엄격한 검색 기회 게이트를 통과한 경우에만 추가됩니다. 수집이 끝나면 전체 통합 ChatGPT 프롬프트 자동 복사를 시도합니다.
         </p>
         {error ? <div className="notice notice--error">{error}</div> : null}
         {notice ? <div className="notice notice--success">{notice}</div> : null}
@@ -362,8 +356,8 @@ export default function NewsResearchWorkbench() {
       {loading ? (
         <section className="panel loading-panel">
           <div className="loading-spinner" />
-          <strong>뉴스를 사건 단위로 묶고 교차 검증하고 있습니다.</strong>
-          <span>뉴스 검색 → Search Trend → Naver 자동완성 → 블로그 경쟁 사전검증 순서로 진행됩니다.</span>
+          <strong>기본 4개 카테고리와 확장 추천 신호를 한 번에 수집하고 있습니다.</strong>
+          <span>뉴스 검색 → 사건 군집화 → Search Trend → Naver 자동완성 → 블로그 경쟁 → 검색 기회 게이트 순서로 진행됩니다.</span>
         </section>
       ) : null}
 
@@ -401,32 +395,67 @@ export default function NewsResearchWorkbench() {
             <div className="section-heading">
               <div>
                 <span className="step">STEP 3</span>
-                <h2>뉴스 검색 기회 후보</h2>
-                <p>예비 AI 추천 점수는 우선순위, 검색 기회 점수는 수요·경쟁 여지·검색 의도·콘텐츠 공백을 함께 보는 사전 기회 지표입니다. 둘 다 최종 성공 확률은 아닙니다.</p>
+                <h2>카테고리별 프롬프트와 뉴스 검색 기회 후보</h2>
+                <p>수집은 모든 기본 카테고리에 대해 한 번만 수행합니다. 카테고리별 복사 버튼으로 후보를 나눠 ChatGPT Pro에 전달하고, 확장 추천이 있으면 임시 그룹도 함께 제공합니다.</p>
               </div>
             </div>
 
-            <div className="opportunity-copy-row">
-              <div>
-                <strong>후보 {feed.opportunities.length}개 전체를 ChatGPT Pro에서 재검증</strong>
-                <span>아래 목록을 끝까지 확인하지 않아도 현재 수집된 전체 후보와 검증 프롬프트가 함께 복사됩니다.</span>
+            <div className="prompt-group-section">
+              <div className="prompt-group-section__heading">
+                <div>
+                  <strong>카테고리별 ChatGPT 프롬프트</strong>
+                  <span>수집은 한 번만 수행합니다. 이후 원하는 카테고리 버튼을 누르면 해당 후보만 담은 프롬프트가 즉시 복사됩니다.</span>
+                </div>
               </div>
-              <button
-                className="button button--primary copy-package-button"
-                type="button"
-                disabled={!researchPackage || copyingPackage}
-                aria-busy={copyingPackage}
-                onClick={() => void copyResearchPackage()}
-              >
-                {copyingPackage ? (
-                  <>
-                    <span className="button-spinner" aria-hidden="true" />
-                    <span>{copyProgress === 100 ? "복사 완료" : "복사 중…"}</span>
-                  </>
-                ) : (
-                  "ChatGPT용 전체 복사"
-                )}
-              </button>
+
+              <div className="prompt-group-grid">
+                <button
+                  type="button"
+                  className="prompt-group-card prompt-group-card--all"
+                  disabled={feed.opportunities.length === 0 || copyingPackage}
+                  onClick={() => void copyResearchPackage(feed, false, null)}
+                >
+                  <span className="prompt-group-card__meta">전체 통합</span>
+                  <strong>모든 카테고리 한 번에 복사</strong>
+                  <small>기본 4개 + 확장 추천 · 후보 {feed.opportunities.length}개</small>
+                  <b>
+                    {copyingPackage && copyingGroupId === "all" ? (
+                      <>
+                        <span className="button-spinner" aria-hidden="true" />
+                        {copyProgress === 100 ? "복사 완료" : "복사 중…"}
+                      </>
+                    ) : "프롬프트 복사"}
+                  </b>
+                </button>
+
+                {feed.groups.map((group) => (
+                  <button
+                    type="button"
+                    className={`prompt-group-card${group.temporary ? " prompt-group-card--temporary" : ""}`}
+                    key={group.id}
+                    disabled={group.opportunityIds.length === 0 || copyingPackage}
+                    onClick={() => void copyResearchPackage(feed, false, group.id)}
+                  >
+                    <span className="prompt-group-card__meta">
+                      {group.temporary ? "임시 확장 추천" : "기본 카테고리"}
+                    </span>
+                    <strong>{group.label}</strong>
+                    <small>후보 {group.opportunityIds.length}개 · {group.description}</small>
+                    <b>
+                      {copyingPackage && copyingGroupId === group.id ? (
+                        <>
+                          <span className="button-spinner" aria-hidden="true" />
+                          {copyProgress === 100 ? "복사 완료" : "복사 중…"}
+                        </>
+                      ) : group.opportunityIds.length > 0 ? "프롬프트 복사" : "현재 후보 없음"}
+                    </b>
+                  </button>
+                ))}
+              </div>
+
+              <p className="prompt-group-help">
+                임시 확장 추천은 기존 4개 카테고리 밖에서 검색 기회 점수·예비 AI 추천 점수·경쟁 위험 게이트를 더 엄격하게 통과한 경우에만 나타납니다. ChatGPT가 최종적으로 기존 카테고리 매핑 또는 신규 카테고리 제안 여부를 다시 검증합니다.
+              </p>
             </div>
 
             {copyingPackage || copyProgress > 0 ? (
@@ -458,7 +487,7 @@ export default function NewsResearchWorkbench() {
                       <div className="rank-badge">{item.rank}</div>
                       <div className="opportunity-title">
                         <div className="badge-row">
-                          <span className="badge badge--category">{item.categoryLabel}</span>
+                          <span className={`badge badge--category${item.isTemporaryCategory ? " badge--temporary-category" : ""}`}>{item.isTemporaryCategory ? `${item.researchGroupLabel} · 임시` : item.categoryLabel}</span>
                           <span className={`badge badge--velocity badge--${item.newsVelocityLabel}`}>{item.newsVelocityLabel}</span>
                           <span className={`badge risk risk--${item.competition.riskLevel.replace(" ", "-")}`}>경쟁 {item.competition.riskLevel}</span>
                           <span className={`badge opportunity opportunity--${item.searchOpportunity.level.replace(" ", "-")}`}>기회 {item.searchOpportunity.level}</span>

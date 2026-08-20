@@ -2,6 +2,7 @@ import { BLOG_CATEGORIES, getBlogCategory } from "@/lib/categories";
 import type {
   CategorySelection,
   NewsOpportunity,
+  NewsResearchGroup,
   NewsResearchResponse,
 } from "@/lib/types";
 
@@ -13,7 +14,7 @@ export const DEFAULT_NEWS_RESEARCH_PROMPT = `당신은 최신 뉴스 신호에�
 - 뉴스 자체를 빠르게 요약하는 글이 아니라, 뉴스를 본 사람이 곧바로 다시 검색할 “두 번째 질문”을 찾는다.
 - 네이버에서 발견한 신호를 그대로 네이버용 글로 끝내지 않는다. Google과 Naver의 현재 검색 결과를 각각 독립적으로 검증해 두 검색엔진에서 모두 검색 의도가 성립하는 주제를 우선한다.
 - 검색량이 큰 헤드 키워드보다 구체적인 대상·조건·일정·변경점·신청 방법·영향·비교·문제 해결 의도가 있는 롱테일을 우선한다.
-- 현재 운영 카테고리인 “IT·AI”, “경제·재테크·투자”, “생활·실용정보”, “취업·자격증·직무”에 직접적이고 자연스럽게 연결되는 후보만 남긴다.
+- 기본 운영 카테고리는 “IT·AI”, “경제·재테크·투자”, “생활·실용정보”, “취업·자격증·직무” 4개다. 다만 웹앱이 별도의 “임시 확장 추천” 그룹을 제공한 경우에는 검색 기회가 충분한지 더 엄격하게 검증하고, 일회성 주제가 아니라 반복 발행 가치까지 있을 때만 신규 카테고리 후보로 제안할 수 있다.
 - 빠르게 발행했을 때 검색 수요가 남아 있을 주제를 우선하고, 이미 뉴스가 과열됐거나 검색 결과가 뉴스·공식 사이트로 완전히 잠긴 주제는 제외한다.
 - Google AdSense 수익화를 위해 단순 기사 재작성·요약 페이지를 만들지 않는다. 뉴스 원문보다 더 빠르게 이해하고 행동할 수 있도록 독자 가치 자산을 최소 2개 이상 제공한다.
 - 원본 기사 문장을 재조합하거나 기사 내용을 베껴 쓰지 않는다. 공식 자료와 독립 출처를 바탕으로 독자에게 필요한 새로운 구조와 설명을 만든다.
@@ -277,7 +278,7 @@ Google과 Naver 양쪽에서 최종 롱테일 수요 검증을 통과한 대표 
 대표 키워드의 단순 변형을 반복하지 말고 서로 의미가 겹치지 않는 관련 엔터티·조건·주제 태그 5~10개를 쉼표로 구분
 
 ## 카테고리명
-“IT·AI”, “경제·재테크·투자”, “생활·실용정보”, “취업·자격증·직무” 중 가장 적합한 카테고리 1개만 정확히 출력한다. 어느 카테고리에도 자연스럽게 해당하지 않으면 “없음”으로 출력한다.`;
+기본적으로 “IT·AI”, “경제·재테크·투자”, “생활·실용정보”, “취업·자격증·직무” 중 가장 적합한 카테고리 1개만 정확히 출력한다. 현재 복사 범위가 “임시 확장 추천”이고 기존 4개에 자연스럽게 들어가지 않으면서 같은 유형의 콘텐츠를 반복 발행할 전략적 가치가 충분하면 “신규 카테고리 제안: 카테고리명” 형식으로 출력한다. 일회성 이슈 하나 때문에 신규 카테고리를 만들지 말고, 어느 쪽도 적절하지 않으면 “없음”으로 출력한다.`;
 
 function formatNumber(value: number | null): string {
   return value === null ? "확인 실패" : value.toLocaleString("ko-KR");
@@ -293,12 +294,33 @@ function formatWindowRange(windowHours: number): string {
   return `${windowHours}시간`;
 }
 
-function formatCategoryPolicy(selection: CategorySelection): string {
+function formatCategoryPolicy(
+  selection: CategorySelection,
+  group?: NewsResearchGroup,
+): string {
+  if (group?.temporary) {
+    return [
+      `현재 복사 범위: 임시 확장 추천 · ${group.label}`,
+      `탐색 범위: ${group.description}`,
+      "이 그룹은 기존 WordPress 4개 카테고리 밖에서 검색 기회가 강한 주제를 별도로 모은 연구용 임시 분류다.",
+      "우선 기존 4개 카테고리 중 자연스럽게 연결되는 곳이 있는지 검토하고, 억지 매핑은 하지 않는다.",
+      "기존 카테고리에 맞지 않더라도 같은 유형의 콘텐츠를 반복 발행할 수 있고 Google·Naver 검색 기회와 AdSense 독자 가치가 충분할 때만 신규 카테고리 제안을 허용한다.",
+    ].join("\n");
+  }
+
+  if (group) {
+    return [
+      `현재 복사 범위: ${group.label}`,
+      `범위: ${group.description}`,
+      "이 카테고리의 후보만 비교해 최대 5개를 추천하고, 다른 카테고리 후보를 끌어오지 않는다.",
+    ].join("\n");
+  }
+
   if (selection === "all") {
     return [
-      "분석 범위: 아래 4개 카테고리 전체",
+      "분석 범위: 아래 4개 기본 카테고리 + 품질 게이트를 통과한 임시 확장 추천",
       ...BLOG_CATEGORIES.map((category) => `- ${category.label}: ${category.description}`),
-      "최종 후보와 완성 글은 반드시 위 카테고리 중 자연스럽게 연결되는 1개를 선택할 것",
+      "기본 4개를 우선하되, 웹앱이 제공한 임시 확장 추천은 별도의 탐색 후보로 검증할 것",
     ].join("\n");
   }
 
@@ -320,7 +342,7 @@ function formatAutocomplete(item: NewsOpportunity): string {
   return item.autocomplete.suggestions.join(" | ");
 }
 
-function formatOpportunity(item: NewsOpportunity): string {
+function formatOpportunity(item: NewsOpportunity, displayRank = item.rank): string {
   const articleLines = item.articles
     .slice(0, 6)
     .map(
@@ -330,13 +352,14 @@ function formatOpportunity(item: NewsOpportunity): string {
     .join("\n");
 
   return [
-    `## 후보 ${item.rank}. ${item.representativeTitle}`,
+    `## 후보 ${displayRank}. ${item.representativeTitle}`,
     `- 예비 AI 추천 점수: ${item.preliminaryAiScore}/100`,
     `- 예상 경쟁 위험: ${item.competition.riskLevel} (${item.competition.riskScore}/100)`,
     `- 대표 핵심 롱테일 사전 힌트: ${item.longtailHint}`,
     `- 검색 기회 점수: ${item.searchOpportunity.score}/100 (${item.searchOpportunity.level}, 게이트 ${item.searchOpportunity.gate})`,
     `- 검색 기회 세부: 수요 ${item.searchOpportunity.breakdown.demandPotential}/25 | 경쟁여지 ${item.searchOpportunity.breakdown.competitionHeadroom}/20 | 검색의도 ${item.searchOpportunity.breakdown.intentSpecificity}/20 | 콘텐츠공백 ${item.searchOpportunity.breakdown.contentGapPotential}/15 | 타이밍 ${item.searchOpportunity.breakdown.timingWindow}/10 | 증거강도 ${item.searchOpportunity.breakdown.evidenceStrength}/10`,
     `- 검색 기회 판정 근거: ${item.searchOpportunity.reasons.join(" / ") || "추가 SERP 검증 필요"}`,
+    `- 연구 그룹: ${item.researchGroupLabel}${item.isTemporaryCategory ? " (임시 확장 추천)" : ""}`,
     `- 카테고리: ${item.categoryLabel}`,
     `- 후보 출처: 뉴스 조기 신호`,
     `- 뉴스 헤드라인 핵심 키워드: ${item.autocomplete.query}`,
@@ -361,16 +384,30 @@ export function buildNewsResearchPackage(input: {
   feed: NewsResearchResponse;
   prompt: string;
   existingContentInventory: string;
+  groupId?: string | null;
 }): string {
   const { feed } = input;
   const existing = input.existingContentInventory.trim();
+  const group = input.groupId
+    ? feed.groups.find((entry) => entry.id === input.groupId)
+    : undefined;
+  const opportunityIds = group ? new Set(group.opportunityIds) : null;
+  const opportunities = opportunityIds
+    ? feed.opportunities.filter((item) => opportunityIds.has(item.id))
+    : feed.opportunities;
+
   return [
     input.prompt.trim() || DEFAULT_NEWS_RESEARCH_PROMPT,
     "",
     "---",
     "",
+    "# 복사 범위",
+    group
+      ? `${group.temporary ? "임시 확장 추천" : "기본 카테고리"} · ${group.label} · 후보 ${opportunities.length}개`
+      : `전체 통합 · 기본 4개 카테고리 + 임시 확장 추천 · 후보 ${opportunities.length}개`,
+    "",
     "# 분석 대상 카테고리",
-    formatCategoryPolicy(feed.summary.categorySelection),
+    formatCategoryPolicy(feed.summary.categorySelection, group),
     "",
     "# 데이터 품질",
     `- 수집 시각: ${feed.collectedAt}`,
@@ -381,11 +418,13 @@ export function buildNewsResearchPackage(input: {
     `- 탐지 범위 안 신규 뉴스: ${feed.summary.recentArticleCount}건`,
     `- 뉴스 확산 분석 범위: 최근 ${formatWindowRange(feed.summary.analysisWindowHours)}`,
     `- 사건 군집: ${feed.summary.clusterCount}개`,
-    `- Search Trend 검증 성공 후보: ${feed.summary.trendValidatedCount}/${feed.opportunities.length}`,
-    `- Naver 블로그 경쟁 사전검증 성공 후보: ${feed.summary.competitionValidatedCount}/${feed.opportunities.length}`,
-    `- Naver 자동완성 확보 후보: ${feed.summary.autocompleteValidatedCount}/${feed.opportunities.length}`,
+    `- 현재 복사 후보: ${opportunities.length}개`,
+    `- 전체 표시 후보 중 Search Trend 검증 성공: ${feed.summary.trendValidatedCount}/${feed.opportunities.length}`,
+    `- 전체 표시 후보 중 Naver 블로그 경쟁 사전검증 성공: ${feed.summary.competitionValidatedCount}/${feed.opportunities.length}`,
+    `- 전체 표시 후보 중 Naver 자동완성 확보: ${feed.summary.autocompleteValidatedCount}/${feed.opportunities.length}`,
     `- 검색 기회 사전 평가: ${feed.summary.searchOpportunityEvaluatedCount}개`,
     `- 검색 기회 게이트 제외: ${feed.summary.searchOpportunityExcludedCount}개`,
+    `- 임시 확장 추천 그룹: ${feed.summary.temporaryGroupCount}개`,
     "- 주의: 뉴스 군집·롱테일·예비 점수·경쟁 위험·검색 기회 점수·자동완성은 코드 기반 사전 압축 신호이며 최종 사실·SEO 판단은 반드시 최신 웹 검색으로 다시 검증할 것",
     feed.warnings.length > 0 ? `- 수집 경고: ${feed.warnings.join(" / ")}` : "- 수집 경고: 없음",
     "",
@@ -398,9 +437,9 @@ export function buildNewsResearchPackage(input: {
     "# 기존 발행 콘텐츠",
     existing || "제공되지 않음. 기존 글 중복 검사를 완료했다고 주장하지 말 것.",
     "",
-    `# 사전 후보 ${feed.opportunities.length}개`,
-    feed.opportunities
-      .map((item) => formatOpportunity(item))
+    `# 사전 후보 ${opportunities.length}개`,
+    opportunities
+      .map((item, index) => formatOpportunity(item, index + 1))
       .join("\n\n"),
   ].join("\n");
 }

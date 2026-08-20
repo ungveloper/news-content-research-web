@@ -78,6 +78,9 @@ export type ScoreBreakdown = {
 };
 
 export type NewsOpportunity = {
+  researchGroupId: string;
+  researchGroupLabel: string;
+  isTemporaryCategory: boolean;
   id: string;
   rank: number;
   categoryId: BlogCategoryId;
@@ -107,6 +110,14 @@ export type NewsOpportunity = {
   articles: NewsArticleSummary[];
 };
 
+export type NewsResearchGroup = {
+  id: string;
+  label: string;
+  description: string;
+  temporary: boolean;
+  opportunityIds: string[];
+};
+
 export type NewsResearchSummary = {
   categorySelection: CategorySelection;
   categoryLabel: string;
@@ -124,12 +135,14 @@ export type NewsResearchSummary = {
   apiMode: "hub" | "legacy";
   windowHours: number;
   analysisWindowHours: number;
+  temporaryGroupCount: number;
 };
 
 export type NewsResearchResponse = {
   ok: true;
   collectedAt: string;
   opportunities: NewsOpportunity[];
+  groups: NewsResearchGroup[];
   summary: NewsResearchSummary;
   warnings: string[];
 };

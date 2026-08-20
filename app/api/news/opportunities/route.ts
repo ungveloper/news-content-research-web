@@ -1,7 +1,4 @@
-import {
-  collectNewsOpportunities,
-  parseCategorySelection,
-} from "@/lib/news/news-research";
+import { collectNewsOpportunities } from "@/lib/news/news-research";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +23,7 @@ export async function POST(request: Request) {
     body = {};
   }
 
-  const categorySelection = parseCategorySelection(body.categorySelection);
+  const categorySelection = "all" as const;
   const windowHours =
     typeof body.windowHours === "number" && Number.isFinite(body.windowHours)
       ? body.windowHours

@@ -28,6 +28,13 @@ for (const label of ["IT·AI", "경제·재테크·투자", "생활·실용정�
   }
 }
 
+for (const marker of ["TEMPORARY_RESEARCH_GROUPS", "건강·의료", "교육·입시", "자동차·모빌리티", "여행·관광"]) {
+  if (!categories.includes(marker)) {
+    console.error(`확장 추천 탐색 정의 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
 const prompt = fs.readFileSync(path.join(root, "lib/research-package.ts"), "utf8");
 for (const heading of ["# 1. 게시용 본문", "# 2. 게시 전 확인 자료", "# 3. 대표 이미지 생성 프롬프트", "# 4. Rank Math SEO 패키지"]) {
   if (!prompt.includes(heading)) {
@@ -54,6 +61,8 @@ for (const marker of [
   "추가 정밀검증 필요성 낮음/보통으로 생략",
   "처음으로 관련 자동완성이 나타나는 단계",
   "제안어 미확보 (검색 수요 없음 의미 아님)",
+  "# 복사 범위",
+  "신규 카테고리 제안",
 ]) {
   if (!prompt.includes(marker)) {
     console.error(`심층 검증 프롬프트 누락: ${marker}`);
@@ -78,9 +87,11 @@ const workbench = fs.readFileSync(
 );
 for (const marker of [
   "DEFAULT_PROMPT_VERSION",
-  "google-naver-adsense-search-opportunity-v6",
+  "all-category-grouped-prompts-v7",
   "최근 10분 (기본 · 초고속 탐지)",
   "copyResearchPackage(result, true)",
+  "prompt-group-grid",
+  "기본 4개 카테고리는 항상 모두 조회",
 ]) {
   if (!workbench.includes(marker)) {
     console.error(`10분 탐지·자동 복사 로직 누락: ${marker}`);
@@ -94,6 +105,9 @@ for (const marker of [
   "Math.max(windowHours, 3)",
   "detectionCutoff",
   "analysisCutoff",
+  "TEMPORARY_RESEARCH_GROUPS",
+  "temporaryGroups",
+  "coreGroups",
 ]) {
   if (!newsResearch.includes(marker)) {
     console.error(`10분 탐지·3시간 확산 분석 로직 누락: ${marker}`);

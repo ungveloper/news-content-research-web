@@ -1,6 +1,7 @@
 import {
   BLOG_CATEGORIES,
   BLOG_CATEGORY_IDS,
+  TEMPORARY_RESEARCH_GROUPS,
   getBlogCategory,
   type BlogCategoryId,
 } from "@/lib/categories";
@@ -34,10 +35,16 @@ import type {
 type SeedDefinition = {
   keyword: string;
   categoryId: BlogCategoryId;
+  researchGroupId: string;
+  researchGroupLabel: string;
+  temporary: boolean;
 };
 
 type CollectedArticle = NewsArticleSummary & {
   categoryId: BlogCategoryId;
+  researchGroupId: string;
+  researchGroupLabel: string;
+  temporary: boolean;
   publishedTimestamp: number;
 };
 
@@ -135,35 +142,51 @@ async function mapWithConcurrency<T, R>(
 }
 
 function buildSeeds(
-  categorySelection: CategorySelection,
   customSeeds: string[],
 ): SeedDefinition[] {
-  const categories =
-    categorySelection === "all"
-      ? BLOG_CATEGORIES
-      : [getBlogCategory(categorySelection)];
-  const defaults = categories.flatMap((category) =>
+  const defaults = BLOG_CATEGORIES.flatMap((category) =>
     category.seedKeywords.map((keyword) => ({
       keyword,
       categoryId: category.id,
+      researchGroupId: category.id,
+      researchGroupLabel: category.label,
+      temporary: false,
+    })),
+  );
+
+  const exploratory = TEMPORARY_RESEARCH_GROUPS.flatMap((group) =>
+    group.seedKeywords.map((keyword) => ({
+      keyword,
+      categoryId: group.fallbackCategoryId,
+      researchGroupId: group.id,
+      researchGroupLabel: group.label,
+      temporary: true,
     })),
   );
 
   const guessCategoryForSeed = (keyword: string): BlogCategoryId => {
-    if (categorySelection !== "all") return categorySelection;
     const normalized = keyword.toLocaleLowerCase("ko-KR");
-    if (/(채용|시험|자격|취업|공무원|면접|인턴|직무)/.test(normalized)) return "career";
+    if (/(채용|시험|자격|취업|공무원|면접|인턴|직무|대학|입시)/.test(normalized)) return "career";
     if (/(금리|환율|코스피|주식|세금|대출|청약|연금|etf|부동산|투자)/i.test(normalized)) return "finance";
-    if (/(ai|인공지능|챗gpt|반도체|보안|개인정보|스마트폰|아이폰|갤럭시|구글|네이버 ai|카카오 ai)/i.test(normalized)) return "it-ai";
+    if (/(ai|인공지능|챗gpt|반도체|보안|개인정보|스마트폰|아이폰|갤럭시|구글|네이버 ai|카카오 ai|전기차|자동차)/i.test(normalized)) return "it-ai";
     return "life";
   };
-  const custom = customSeeds.slice(0, 8).map((keyword) => ({
-    keyword,
-    categoryId: guessCategoryForSeed(keyword),
-  }));
+  const custom = customSeeds.slice(0, 8).map((keyword) => {
+    const categoryId = guessCategoryForSeed(keyword);
+    const category = getBlogCategory(categoryId);
+    return {
+      keyword,
+      categoryId,
+      researchGroupId: categoryId,
+      researchGroupLabel: category.label,
+      temporary: false,
+    };
+  });
 
+  // 기본 4개 카테고리를 먼저 배치해 같은 기사가 여러 시드에 잡힐 때
+  // 기존 WordPress 분류를 우선하고, 확장 탐색은 보완 신호로만 사용합니다.
   const seen = new Set<string>();
-  return [...defaults, ...custom].filter((seed) => {
+  return [...defaults, ...custom, ...exploratory].filter((seed) => {
     const key = seed.keyword.toLocaleLowerCase("ko-KR");
     if (!key || seen.has(key)) return false;
     seen.add(key);
@@ -208,21 +231,43 @@ function clusterArticles(articles: CollectedArticle[]): ArticleCluster[] {
   return clusters;
 }
 
-function getDominantCategory(cluster: ArticleCluster): {
+function getDominantGrouping(cluster: ArticleCluster): {
   categoryId: BlogCategoryId;
   categoryShare: number;
+  researchGroupId: string;
+  researchGroupLabel: string;
+  temporary: boolean;
 } {
-  const counts = new Map<BlogCategoryId, number>();
+  const categoryCounts = new Map<BlogCategoryId, number>();
+  const groupCounts = new Map<string, { count: number; label: string; temporary: boolean }>();
+
   for (const article of cluster.articles) {
-    counts.set(article.categoryId, (counts.get(article.categoryId) ?? 0) + 1);
+    categoryCounts.set(article.categoryId, (categoryCounts.get(article.categoryId) ?? 0) + 1);
+    const current = groupCounts.get(article.researchGroupId) ?? {
+      count: 0,
+      label: article.researchGroupLabel,
+      temporary: article.temporary,
+    };
+    current.count += 1;
+    groupCounts.set(article.researchGroupId, current);
   }
 
-  const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  const categoryId = best?.[0] ?? BLOG_CATEGORIES[0].id;
-  const count = best?.[1] ?? 1;
+  const bestCategory = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const categoryId = bestCategory?.[0] ?? BLOG_CATEGORIES[0].id;
+  const categoryCount = bestCategory?.[1] ?? 1;
+  const bestGroup = [...groupCounts.entries()].sort((a, b) => {
+    const countDiff = b[1].count - a[1].count;
+    if (countDiff !== 0) return countDiff;
+    if (a[1].temporary !== b[1].temporary) return a[1].temporary ? 1 : -1;
+    return 0;
+  })[0];
+
   return {
     categoryId,
-    categoryShare: count / Math.max(cluster.articles.length, 1),
+    categoryShare: categoryCount / Math.max(cluster.articles.length, 1),
+    researchGroupId: bestGroup?.[0] ?? categoryId,
+    researchGroupLabel: bestGroup?.[1].label ?? getBlogCategory(categoryId).label,
+    temporary: bestGroup?.[1].temporary ?? false,
   };
 }
 
@@ -338,7 +383,7 @@ function buildEmptyTrend(status: "no-data" | "error" = "no-data"): SearchTrendSi
 async function enrichTrends(
   opportunities: NewsOpportunity[],
 ): Promise<Map<string, SearchTrendSignal>> {
-  const target = opportunities.slice(0, 30);
+  const target = opportunities.slice(0, 40);
   const map = new Map<string, SearchTrendSignal>();
   const endDate = toSeoulDateString(new Date());
   const startDate = toSeoulDateString(addDays(new Date(), -21));
@@ -402,7 +447,7 @@ async function enrichTrends(
 async function enrichAutocomplete(
   opportunities: NewsOpportunity[],
 ): Promise<Map<string, AutocompleteSignal>> {
-  const target = opportunities.slice(0, 30);
+  const target = opportunities.slice(0, 40);
   const map = new Map<string, AutocompleteSignal>();
 
   await mapWithConcurrency(target, 3, async (item) => {
@@ -424,7 +469,7 @@ async function enrichAutocomplete(
 async function enrichCompetition(
   opportunities: NewsOpportunity[],
 ): Promise<Map<string, CompetitionSignal>> {
-  const target = opportunities.slice(0, 24);
+  const target = opportunities.slice(0, 48);
   const map = new Map<string, CompetitionSignal>();
 
   await mapWithConcurrency(target, 5, async (item) => {
@@ -462,6 +507,56 @@ function buildReasons(item: NewsOpportunity): string[] {
   return reasons.slice(0, 5);
 }
 
+function compareCandidatePriority(a: NewsOpportunity, b: NewsOpportunity): number {
+  return (
+    b.searchOpportunity.score - a.searchOpportunity.score ||
+    b.preliminaryAiScore - a.preliminaryAiScore ||
+    a.competition.riskScore - b.competition.riskScore ||
+    b.independentPublisherCount - a.independentPublisherCount ||
+    a.ageMinutes - b.ageMinutes
+  );
+}
+
+function selectPreEnrichmentCandidates(
+  items: NewsOpportunity[],
+  maxResults: number,
+): NewsOpportunity[] {
+  const coreTarget = clamp(Math.ceil(maxResults / BLOG_CATEGORIES.length) + 4, 7, 12);
+  const selected = new Map<string, NewsOpportunity>();
+
+  for (const category of BLOG_CATEGORIES) {
+    items
+      .filter((item) => item.researchGroupId === category.id)
+      .sort((a, b) =>
+        b.preliminaryAiScore - a.preliminaryAiScore ||
+        b.independentPublisherCount - a.independentPublisherCount ||
+        a.ageMinutes - b.ageMinutes,
+      )
+      .slice(0, coreTarget)
+      .forEach((item) => selected.set(item.id, item));
+  }
+
+  for (const group of TEMPORARY_RESEARCH_GROUPS) {
+    items
+      .filter((item) => item.researchGroupId === group.id)
+      .sort((a, b) =>
+        b.preliminaryAiScore - a.preliminaryAiScore ||
+        b.independentPublisherCount - a.independentPublisherCount ||
+        a.ageMinutes - b.ageMinutes,
+      )
+      .slice(0, 4)
+      .forEach((item) => selected.set(item.id, item));
+  }
+
+  return [...selected.values()]
+    .sort((a, b) =>
+      b.preliminaryAiScore - a.preliminaryAiScore ||
+      b.independentPublisherCount - a.independentPublisherCount ||
+      a.ageMinutes - b.ageMinutes,
+    )
+    .slice(0, 48);
+}
+
 export async function collectNewsOpportunities(input: {
   categorySelection: CategorySelection;
   windowHours: number;
@@ -469,7 +564,7 @@ export async function collectNewsOpportunities(input: {
   maxResults: number;
 }): Promise<NewsResearchResponse> {
   const now = Date.now();
-  const seeds = buildSeeds(input.categorySelection, input.customSeeds);
+  const seeds = buildSeeds(input.customSeeds);
   const windowHours = clamp(input.windowHours, 1 / 6, 48);
   const analysisWindowHours = Math.max(windowHours, 3);
   const detectionCutoff = now - windowHours * 60 * 60 * 1000;
@@ -509,6 +604,9 @@ export async function collectNewsOpportunities(input: {
       publisher: parsePublisher(originalUrl),
       matchedSeed: seed.keyword,
       categoryId: seed.categoryId,
+      researchGroupId: seed.researchGroupId,
+      researchGroupLabel: seed.researchGroupLabel,
+      temporary: seed.temporary,
       publishedTimestamp: timestamp,
     };
     const key = normalizeUrl(originalUrl || item.link);
@@ -534,7 +632,7 @@ export async function collectNewsOpportunities(input: {
     ),
   );
 
-  let candidates: NewsOpportunity[] = clusters
+  const rawCandidates: NewsOpportunity[] = clusters
     .filter((cluster) => {
       const publishers = new Set(cluster.articles.map((article) => article.publisher));
       const title = cluster.articles[0]?.title ?? "";
@@ -547,7 +645,7 @@ export async function collectNewsOpportunities(input: {
       const last1HourCount = sorted.filter((article) => now - article.publishedTimestamp <= 60 * 60 * 1000).length;
       const last3HourCount = sorted.filter((article) => now - article.publishedTimestamp <= 3 * 60 * 60 * 1000).length;
       const last6HourCount = sorted.filter((article) => now - article.publishedTimestamp <= 6 * 60 * 60 * 1000).length;
-      const dominant = getDominantCategory(cluster);
+      const dominant = getDominantGrouping(cluster);
       const category = getBlogCategory(dominant.categoryId);
       const topic = extractTopic(cluster);
       const derived = deriveLongtail(topic, representative.title, dominant.categoryId);
@@ -582,6 +680,9 @@ export async function collectNewsOpportunities(input: {
       });
 
       return {
+        researchGroupId: dominant.researchGroupId,
+        researchGroupLabel: dominant.researchGroupLabel,
+        isTemporaryCategory: dominant.temporary,
         id: `news-${index}-${Buffer.from(`${topic}-${representative.publishedAt}`).toString("base64url").slice(0, 10)}`,
         rank: index + 1,
         categoryId: dominant.categoryId,
@@ -610,14 +711,9 @@ export async function collectNewsOpportunities(input: {
         reasons: [],
         articles: sorted.slice(0, 8).map(toArticleSummary),
       } satisfies NewsOpportunity;
-    })
-    .sort(
-      (a, b) =>
-        b.preliminaryAiScore - a.preliminaryAiScore ||
-        b.independentPublisherCount - a.independentPublisherCount ||
-        a.ageMinutes - b.ageMinutes,
-    )
-    .slice(0, 36);
+    });
+
+  let candidates = selectPreEnrichmentCandidates(rawCandidates, input.maxResults);
 
   const trendMap = await enrichTrends(candidates);
   candidates = candidates.map((item) => ({
@@ -680,16 +776,56 @@ export async function collectNewsOpportunities(input: {
     (item) => item.searchOpportunity.gate === "제외",
   ).length;
 
-  candidates = candidates
+  const eligibleCandidates = candidates
     .filter((item) => item.searchOpportunity.gate !== "제외")
-    .sort(
-      (a, b) =>
-        b.searchOpportunity.score - a.searchOpportunity.score ||
-        b.preliminaryAiScore - a.preliminaryAiScore ||
-        a.competition.riskScore - b.competition.riskScore ||
-        b.independentPublisherCount - a.independentPublisherCount,
-    )
-    .slice(0, clamp(input.maxResults, 5, 30))
+    .sort(compareCandidatePriority);
+
+  const normalizedMaxResults = clamp(input.maxResults, 8, 32);
+  const baseCoreLimit = Math.floor(normalizedMaxResults / BLOG_CATEGORIES.length);
+  const coreRemainder = normalizedMaxResults % BLOG_CATEGORIES.length;
+  const selectedIds = new Set<string>();
+
+  const coreGroups = BLOG_CATEGORIES.map((category, categoryIndex) => {
+    const groupLimit = baseCoreLimit + (categoryIndex < coreRemainder ? 1 : 0);
+    const items = eligibleCandidates
+      .filter((item) => item.researchGroupId === category.id)
+      .slice(0, groupLimit);
+    items.forEach((item) => selectedIds.add(item.id));
+    return {
+      id: category.id,
+      label: category.label,
+      description: category.description,
+      temporary: false,
+      opportunityIds: items.map((item) => item.id),
+    };
+  });
+
+  // 확장 그룹은 기존 4개 카테고리보다 더 엄격한 게이트를 통과한 경우에만 노출합니다.
+  // 단순히 경쟁이 낮다는 이유만으로 임시 카테고리를 만들지 않습니다.
+  const temporaryGroups = TEMPORARY_RESEARCH_GROUPS.map((group) => {
+    const items = eligibleCandidates
+      .filter(
+        (item) =>
+          item.researchGroupId === group.id &&
+          item.searchOpportunity.score >= 68 &&
+          item.preliminaryAiScore >= 68 &&
+          item.competition.riskScore < 65,
+      )
+      .slice(0, 3);
+    items.forEach((item) => selectedIds.add(item.id));
+    return {
+      id: group.id,
+      label: group.label,
+      description: group.description,
+      temporary: true,
+      opportunityIds: items.map((item) => item.id),
+    };
+  }).filter((group) => group.opportunityIds.length > 0);
+
+  const groups = [...coreGroups, ...temporaryGroups];
+  const displayCandidates = eligibleCandidates
+    .filter((item) => selectedIds.has(item.id))
+    .sort(compareCandidatePriority)
     .map((item, index) => ({ ...item, rank: index + 1 }));
 
   if (recentArticles.length === 0) {
@@ -703,41 +839,43 @@ export async function collectNewsOpportunities(input: {
       `사전 검색 기회 게이트에서 ${searchOpportunityExcludedCount}개 후보를 제외했습니다. 낮은 경쟁만으로 기회라고 보지 않고 수요·검색 의도·콘텐츠 공백·증거 강도를 함께 반영했습니다.`,
     );
   }
+  if (temporaryGroups.length > 0) {
+    warnings.push(
+      `기본 4개 카테고리 밖에서도 검색 기회가 강한 ${temporaryGroups.length}개 확장 추천 그룹을 임시로 표시했습니다. 실제 WordPress 카테고리 추가 여부는 ChatGPT 심층 검증에서 다시 판단합니다.`,
+    );
+  }
   if (
-    candidates.length > 0 &&
-    candidates.every((item) => item.autocomplete.status !== "ok")
+    displayCandidates.length > 0 &&
+    displayCandidates.every((item) => item.autocomplete.status !== "ok")
   ) {
     warnings.push(
       "NAVER 자동완성 보조 신호를 확보하지 못했습니다. 자동완성은 비공식 보조 수집이므로 뉴스·Trend·블로그 검증은 그대로 유지됩니다.",
     );
   }
 
-  const categoryLabel =
-    input.categorySelection === "all"
-      ? "전체 4개 카테고리"
-      : getBlogCategory(input.categorySelection).label;
-
   return {
     ok: true,
     collectedAt: new Date().toISOString(),
-    opportunities: candidates,
+    opportunities: displayCandidates,
+    groups,
     summary: {
-      categorySelection: input.categorySelection,
-      categoryLabel,
+      categorySelection: "all",
+      categoryLabel: "전체 기본 카테고리 + 확장 추천",
       requestedSeedCount: seeds.length,
       successfulSeedCount,
       failedSeedCount,
       rawArticleCount: rawRows.length,
       recentArticleCount: recentArticles.length,
       clusterCount: clusters.length,
-      trendValidatedCount: candidates.filter((item) => item.trend.status === "ok").length,
-      competitionValidatedCount: candidates.filter((item) => item.competition.status === "ok").length,
-      autocompleteValidatedCount: candidates.filter((item) => item.autocomplete.status === "ok").length,
+      trendValidatedCount: displayCandidates.filter((item) => item.trend.status === "ok").length,
+      competitionValidatedCount: displayCandidates.filter((item) => item.competition.status === "ok").length,
+      autocompleteValidatedCount: displayCandidates.filter((item) => item.autocomplete.status === "ok").length,
       searchOpportunityEvaluatedCount,
       searchOpportunityExcludedCount,
       apiMode: getNaverApiMode(),
       windowHours,
       analysisWindowHours,
+      temporaryGroupCount: temporaryGroups.length,
     },
     warnings,
   };
