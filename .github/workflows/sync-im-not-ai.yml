@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: sync-im-not-ai-main
@@ -26,15 +27,16 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: main
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -58,7 +60,13 @@ jobs:
 
       - name: Install dependencies
         if: steps.changes.outputs.changed == 'true'
-        run: npm ci
+        run: npm ci --audit=false
+
+      - name: Validate production dependency security
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          npm run audit:production
+          npm run audit:security
 
       - name: Validate project and im-not-ai integration contract
         if: steps.changes.outputs.changed == 'true'
@@ -73,3 +81,50 @@ jobs:
           git add lib/im-not-ai.generated.ts third_party/im-not-ai/LICENSE third_party/im-not-ai/sync-state.json
           git commit -m "변경: im-not-ai 최신 규칙 동기화"
           git push origin HEAD:main
+
+      - name: Create or update sync failure issue
+        if: ${{ failure() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_TITLE: "im-not-ai 자동 동기화 실패 — 검토 필요"
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ISSUE_NUMBER="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq '.[] | select(.title == "im-not-ai 자동 동기화 실패 — 검토 필요") | .number' | head -n 1)"
+
+          BODY="$(mktemp)"
+          cat > "$BODY" <<EOF
+          im-not-ai 자동 동기화가 실패했습니다.
+
+          - 실행: $RUN_URL
+          - 이벤트: $GITHUB_EVENT_NAME
+          - ref: $GITHUB_REF
+          - commit: $GITHUB_SHA
+          - run attempt: $GITHUB_RUN_ATTEMPT
+
+          major 버전 변경, quick-rules 대규모 변경, upstream 구조 변경, 검증 실패 또는 일시적인 GitHub/npm 오류일 수 있습니다.
+          실행 로그를 확인한 뒤 필요한 경우 workflow_dispatch의 수동 승인 옵션을 사용하세요.
+          EOF
+
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$ALERT_TITLE" --body-file "$BODY"
+          fi
+
+      - name: Close resolved sync failure issue
+        if: ${{ success() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ISSUE_NUMBER="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq '.[] | select(.title == "im-not-ai 자동 동기화 실패 — 검토 필요") | .number' | head -n 1)"
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "다음 동기화가 정상 완료되어 자동으로 닫습니다: $RUN_URL"
+            gh issue close "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --reason completed
+          fi

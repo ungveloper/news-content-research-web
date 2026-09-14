@@ -1,0 +1,80 @@
+name: Dependency security audit
+
+on:
+  schedule:
+    - cron: "43 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: dependency-security-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Audit production and reviewed dev dependency risks
+        run: |
+          npm run audit:production
+          npm run audit:security
+
+      - name: Create or update dependency security issue
+        if: ${{ failure() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_TITLE: "npm 보안 점검 실패 — 검토 필요"
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ISSUE_NUMBER="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq '.[] | select(.title == "npm 보안 점검 실패 — 검토 필요") | .number' | head -n 1)"
+
+          BODY="$(mktemp)"
+          cat > "$BODY" <<EOF
+          정기 npm 보안 점검이 실패했습니다.
+
+          - 실행: $RUN_URL
+          - commit: $GITHUB_SHA
+          - run attempt: $GITHUB_RUN_ATTEMPT
+
+          production high/critical 취약점, 새 dev-tool advisory, 기존 예외의 재검토 기한 만료 또는 npm audit 오류가 원인일 수 있습니다.
+          자동으로 major 버전을 올리거나 npm audit fix --force를 실행하지 않습니다.
+          EOF
+
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$ALERT_TITLE" --body-file "$BODY"
+          fi
+
+      - name: Close resolved dependency security issue
+        if: ${{ success() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ISSUE_NUMBER="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq '.[] | select(.title == "npm 보안 점검 실패 — 검토 필요") | .number' | head -n 1)"
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "정기 npm 보안 점검이 다시 통과해 자동으로 닫습니다: $RUN_URL"
+            gh issue close "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --reason completed
+          fi

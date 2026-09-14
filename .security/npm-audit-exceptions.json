@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "exceptions": [
+    {
+      "id": "brace-expansion-eslint9-dev-only",
+      "advisories": [
+        "GHSA-mh99-v99m-4gvg",
+        "GHSA-7r86-64r9-qc3w"
+      ],
+      "rootPackage": "brace-expansion",
+      "scope": "dev-only",
+      "expiresOn": "2026-11-15",
+      "requiredInstalledFloors": {
+        "1": "1.1.18",
+        "5": "5.0.9"
+      },
+      "rationale": "ESLint 9/minimatch 3 requires the brace-expansion 1.x CommonJS API. Forcing brace-expansion 5.x breaks that API, while ESLint 10 remains blocked by eslint-plugin-react/eslint-plugin-jsx-a11y peer ranges in the current Next.js lint stack. Only this dev-only advisory chain is tolerated, and only when every installed brace-expansion copy is on the line-compatible patched floor checked by scripts/audit-security.mjs."
+    }
+  ]
+}

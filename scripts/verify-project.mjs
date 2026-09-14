@@ -15,7 +15,10 @@ const requiredFiles = [
   "lib/im-not-ai.ts",
   "lib/im-not-ai.generated.ts",
   "scripts/sync-im-not-ai.mjs",
+  "scripts/audit-security.mjs",
   ".github/workflows/sync-im-not-ai.yml",
+  ".github/workflows/dependency-audit.yml",
+  ".security/npm-audit-exceptions.json",
   "third_party/im-not-ai/LICENSE",
   "third_party/im-not-ai/sync-state.json",
 ];
@@ -191,12 +194,152 @@ for (const marker of [
   "allow_major_change:",
   "allow_large_change:",
   "npm run validate",
+  "npm run audit:production",
+  "npm run audit:security",
   "third_party/im-not-ai/sync-state.json",
   'git commit -m "변경: im-not-ai 최신 규칙 동기화"',
+  "issues: write",
+  "im-not-ai 자동 동기화 실패 — 검토 필요",
+  "if: ${{ failure() }}",
+  "if: ${{ success() }}",
+  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+  "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
 ]) {
   if (!syncWorkflow.includes(marker)) {
     console.error(`im-not-ai GitHub Actions 계약 누락: ${marker}`);
     process.exit(1);
+  }
+}
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const packageLock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
+
+function versionAtLeast(actual, minimum) {
+  if (typeof actual !== "string") return false;
+  const a = actual.split("-")[0].split(".").map(Number);
+  const b = minimum.split("-")[0].split(".").map(Number);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const left = a[index] ?? 0;
+    const right = b[index] ?? 0;
+    if (left > right) return true;
+    if (left < right) return false;
+  }
+  return true;
+}
+
+if (packageJson.scripts?.["audit:production"] !== "npm audit --package-lock-only --omit=dev --audit-level=high") {
+  console.error("production npm audit 스크립트가 누락되었습니다.");
+  process.exit(1);
+}
+if (packageJson.scripts?.["audit:security"] !== "node scripts/audit-security.mjs") {
+  console.error("전체 npm 보안 정책 검사 스크립트가 누락되었습니다.");
+  process.exit(1);
+}
+
+const installedNext = packageLock.packages?.["node_modules/next"]?.version;
+const installedEslintNext = packageLock.packages?.["node_modules/eslint-config-next"]?.version;
+const installedSharp = packageLock.packages?.["node_modules/sharp"]?.version;
+const installedNextPostcss =
+  packageLock.packages?.["node_modules/next/node_modules/postcss"]?.version
+  ?? packageLock.packages?.["node_modules/postcss"]?.version;
+
+if (!versionAtLeast(installedNext, "16.3.5")) {
+  console.error(`Next.js 보안 패치 버전 미달: ${installedNext ?? "없음"} (최소 16.3.5)`);
+  process.exit(1);
+}
+if (installedEslintNext !== installedNext) {
+  console.error(`next와 eslint-config-next 버전 불일치: ${installedNext} / ${installedEslintNext}`);
+  process.exit(1);
+}
+if (!versionAtLeast(installedSharp, "0.35.4")) {
+  console.error(`sharp 보안 패치 버전 미달: ${installedSharp ?? "없음"} (최소 0.35.4)`);
+  process.exit(1);
+}
+if (!versionAtLeast(installedNextPostcss, "8.5.23")) {
+  console.error(`PostCSS 보안 패치 버전 미달: ${installedNextPostcss ?? "없음"} (최소 8.5.23)`);
+  process.exit(1);
+}
+
+const braceCopies = Object.entries(packageLock.packages ?? {})
+  .filter(([packagePath]) => packagePath.endsWith("node_modules/brace-expansion"));
+for (const [packagePath, metadata] of braceCopies) {
+  const version = metadata.version;
+  const major = String(version ?? "").split(".")[0];
+  const floor = major === "1" ? "1.1.18" : major === "5" ? "5.0.9" : null;
+  if (!floor || metadata.dev !== true || !versionAtLeast(version, floor)) {
+    console.error(`검토되지 않은 brace-expansion 해상도: ${packagePath} -> ${version ?? "없음"}`);
+    process.exit(1);
+  }
+}
+
+const auditPolicy = JSON.parse(
+  fs.readFileSync(path.join(root, ".security/npm-audit-exceptions.json"), "utf8"),
+);
+const bracePolicy = auditPolicy.exceptions?.find(
+  (entry) => entry.id === "brace-expansion-eslint9-dev-only",
+);
+if (
+  !bracePolicy
+  || bracePolicy.scope !== "dev-only"
+  || !bracePolicy.advisories?.includes("GHSA-mh99-v99m-4gvg")
+  || bracePolicy.expiresOn !== "2026-11-15"
+) {
+  console.error("brace-expansion dev-only audit 예외 정책이 누락되거나 예상과 다릅니다.");
+  process.exit(1);
+}
+
+const auditSecurityScript = fs.readFileSync(
+  path.join(root, "scripts/audit-security.mjs"),
+  "utf8",
+);
+for (const marker of [
+  "allNodesAreDev",
+  "advisoryIdsFor",
+  "requiredInstalledFloors",
+  "재검토 기한",
+  "production/runtime 경로",
+]) {
+  if (!auditSecurityScript.includes(marker)) {
+    console.error(`npm audit 정책 검사 로직 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+const dependencyAuditWorkflow = fs.readFileSync(
+  path.join(root, ".github/workflows/dependency-audit.yml"),
+  "utf8",
+);
+for (const marker of [
+  'cron: "43 21 * * *"',
+  "npm run audit:production",
+  "npm run audit:security",
+  "npm 보안 점검 실패 — 검토 필요",
+  "issues: write",
+  "if: ${{ failure() }}",
+  "if: ${{ success() }}",
+  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+  "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+]) {
+  if (!dependencyAuditWorkflow.includes(marker)) {
+    console.error(`npm 정기 보안 점검 계약 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+const workflowDir = path.join(root, ".github/workflows");
+for (const workflowName of fs.readdirSync(workflowDir).filter(
+  (name) => name.endsWith(".yml") || name.endsWith(".yaml"),
+)) {
+  const workflowText = fs.readFileSync(path.join(workflowDir, workflowName), "utf8");
+  const usesPattern = /^\s*uses:\s*([^@\s]+)@([^\s#]+)/gm;
+  let match;
+  while ((match = usesPattern.exec(workflowText)) !== null) {
+    const action = match[1];
+    const ref = match[2];
+    if (!action.startsWith("./") && !/^[0-9a-f]{40}$/.test(ref)) {
+      console.error(`GitHub Action이 commit SHA로 고정되지 않았습니다: ${workflowName} -> ${action}@${ref}`);
+      process.exit(1);
+    }
   }
 }
 
