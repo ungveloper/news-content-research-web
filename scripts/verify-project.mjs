@@ -202,8 +202,9 @@ for (const marker of [
   "im-not-ai 자동 동기화 실패 — 검토 필요",
   "if: ${{ failure() }}",
   "if: ${{ success() }}",
-  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-  "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+  "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+  "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+  "node-version: 24",
 ]) {
   if (!syncWorkflow.includes(marker)) {
     console.error(`im-not-ai GitHub Actions 계약 누락: ${marker}`);
@@ -317,8 +318,9 @@ for (const marker of [
   "issues: write",
   "if: ${{ failure() }}",
   "if: ${{ success() }}",
-  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-  "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+  "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+  "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+  "node-version: 24",
 ]) {
   if (!dependencyAuditWorkflow.includes(marker)) {
     console.error(`npm 정기 보안 점검 계약 누락: ${marker}`);

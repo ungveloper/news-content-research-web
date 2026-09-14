@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const checkoutSha = "11d5960a326750d5838078e36cf38b85af677262";
-const setupNodeSha = "49933ea5288caeca8642d1e84afbd3f7d6820020";
+const checkoutSha = "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09";
+const setupNodeSha = "a0853c24544627f65ddf259abe73b1d18a591444";
 
 const requiredFiles = [
   ".github/workflows/ci.yml",
@@ -44,6 +44,7 @@ for (const marker of [
   "npm run validate",
   `actions/checkout@${checkoutSha}`,
   `actions/setup-node@${setupNodeSha}`,
+  "node-version: 24",
 ]) {
   if (!ciWorkflow.includes(marker)) {
     console.error(`일반 CI 계약 누락: ${marker}`);
@@ -69,6 +70,7 @@ for (const [file, title] of [
     "if: ${{ success() }}",
     `actions/checkout@${checkoutSha}`,
     `actions/setup-node@${setupNodeSha}`,
+    "node-version: 24",
   ]) {
     if (!workflow.includes(marker)) {
       console.error(`알림 실전 테스트 계약 누락: ${file} -> ${marker}`);
@@ -77,11 +79,24 @@ for (const [file, title] of [
   }
 }
 
+
+const forbiddenActionRuntimeMarkers = [
+  ["actions/checkout@", "11d5960a326750d5838078e36cf38b85af677262"].join(""),
+  ["actions/setup-node@", "49933ea5288caeca8642d1e84afbd3f7d6820020"].join(""),
+  ["node-version:", " 20"].join(""),
+];
+
 const workflowDir = path.join(root, ".github/workflows");
 for (const workflowName of fs.readdirSync(workflowDir).filter(
   (name) => name.endsWith(".yml") || name.endsWith(".yaml"),
 )) {
   const workflowText = fs.readFileSync(path.join(workflowDir, workflowName), "utf8");
+  for (const marker of forbiddenActionRuntimeMarkers) {
+    if (workflowText.includes(marker)) {
+      console.error(`폐기된 GitHub Actions/Node 20 런타임 설정이 남아 있습니다: ${workflowName} -> ${marker}`);
+      process.exit(1);
+    }
+  }
   const usesPattern = /^\s*uses:\s*([^@\s]+)@([^\s#]+)/gm;
   let match;
   while ((match = usesPattern.exec(workflowText)) !== null) {
@@ -94,4 +109,4 @@ for (const workflowName of fs.readdirSync(workflowDir).filter(
   }
 }
 
-console.log("zero-warning lint · main/PR CI · 실패 알림 테스트 계약 검증 완료");
+console.log("zero-warning lint · Node 24 Actions · main/PR CI · 실패 알림 테스트 계약 검증 완료");
