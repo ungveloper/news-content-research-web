@@ -111,7 +111,7 @@ const fullAudit = spawnSync(
 let report;
 try {
   report = JSON.parse(fullAudit.stdout || "{}");
-} catch (error) {
+} catch {
   console.error("npm audit JSON을 해석하지 못했습니다.");
   if (fullAudit.stderr) console.error(fullAudit.stderr.trim());
   process.exit(1);
