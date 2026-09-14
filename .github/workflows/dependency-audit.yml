@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "43 21 * * *"
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: "실패 알림 경로 테스트 (실제 GitHub Issue 생성)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -29,6 +35,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Simulate failure for alert-path test
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_alert }}
+        run: |
+          echo "의도된 실패: dependency security 실패 알림 경로를 검증합니다."
+          exit 1
+
       - name: Audit production and reviewed dev dependency risks
         run: |
           npm run audit:production
@@ -40,6 +52,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ALERT_TITLE: "npm 보안 점검 실패 — 검토 필요"
+          TEST_ALERT: ${{ github.event_name == 'workflow_dispatch' && inputs.test_alert && 'yes' || 'no' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -53,6 +66,7 @@ jobs:
           - 실행: $RUN_URL
           - commit: $GITHUB_SHA
           - run attempt: $GITHUB_RUN_ATTEMPT
+          - alert-path test: $TEST_ALERT
 
           production high/critical 취약점, 새 dev-tool advisory, 기존 예외의 재검토 기한 만료 또는 npm audit 오류가 원인일 수 있습니다.
           자동으로 major 버전을 올리거나 npm audit fix --force를 실행하지 않습니다.

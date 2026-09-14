@@ -6,10 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "audit:production": "npm audit --package-lock-only --omit=dev --audit-level=high",
     "audit:security": "node scripts/audit-security.mjs",
-    "validate": "node scripts/verify-project.mjs && npm run lint && npm run build"
+    "validate": "node scripts/verify-project.mjs && node scripts/verify-ci-hardening.mjs && npm run lint && npm run build"
   },
   "dependencies": {
     "next": "16.3.5",
