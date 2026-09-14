@@ -1,0 +1,10 @@
+{
+  "repository": "epoko77-ai/im-not-ai",
+  "ref": "main",
+  "current": {
+    "version": "2.3.2",
+    "skillBlobSha": "02aacfaa845597a3b9018394ab37cb5e07da1774",
+    "quickRulesBlobSha": "0d0dc7a451cf91b48bd30928cef213ff4f177504"
+  },
+  "previous": null
+}

@@ -12,6 +12,12 @@ const requiredFiles = [
   "lib/news/scoring.ts",
   "lib/research-package.ts",
   "lib/types.ts",
+  "lib/im-not-ai.ts",
+  "lib/im-not-ai.generated.ts",
+  "scripts/sync-im-not-ai.mjs",
+  ".github/workflows/sync-im-not-ai.yml",
+  "third_party/im-not-ai/LICENSE",
+  "third_party/im-not-ai/sync-state.json",
 ];
 
 const missing = requiredFiles.filter((file) => !fs.existsSync(path.join(root, file)));
@@ -44,6 +50,8 @@ for (const heading of ["# 1. 게시용 본문", "# 2. 게시 전 확인 자료",
 }
 
 for (const marker of [
+  "<!-- 게시용 본문 시작 -->",
+  "<!-- 게시용 본문 끝 -->",
   "NAVER 자동완성",
   "예비 AI 추천 점수",
   "예상 경쟁 위험",
@@ -70,6 +78,17 @@ for (const marker of [
   }
 }
 
+for (const marker of [
+  'import { buildImNotAiFinalizationPrompt } from "@/lib/im-not-ai";',
+  "const imNotAiFinalizationPrompt = buildImNotAiFinalizationPrompt();",
+  "imNotAiFinalizationPrompt,",
+]) {
+  if (!prompt.includes(marker)) {
+    console.error(`im-not-ai 최종 후처리 연결 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
 const scoreIndex = prompt.indexOf("- **예비 AI 추천 점수:**");
 const riskIndex = prompt.indexOf("- **예상 경쟁 위험:**");
 const longtailIndex = prompt.indexOf("- **대표 핵심 롱테일:**");
@@ -80,6 +99,106 @@ if (!(scoreIndex < riskIndex && riskIndex < longtailIndex && longtailIndex < opp
   process.exit(1);
 }
 
+const imNotAi = fs.readFileSync(path.join(root, "lib/im-not-ai.ts"), "utf8");
+for (const marker of [
+  "최종 WordPress 본문 후처리 전용",
+  "<!-- 게시용 본문 시작 -->",
+  "<!-- 게시용 본문 끝 -->",
+  "게시용 본문에만 적용",
+  "수술적 윤문 / no-op 우선",
+  "약 30%",
+  "50% 수준의 전면 재작성은 하지 않는다",
+  "SEO title",
+  "im-not-ai가 수정하지 않는다",
+  "upstream 규칙 격리",
+  "도구 실행",
+]) {
+  if (!imNotAi.includes(marker)) {
+    console.error(`im-not-ai 본문 후처리 계약 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+const generated = fs.readFileSync(path.join(root, "lib/im-not-ai.generated.ts"), "utf8");
+function generatedString(name) {
+  const match = generated.match(new RegExp(`^export const ${name} = (.+);$`, "m"));
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+const imNotAiVersion = generatedString("IM_NOT_AI_SKILL_VERSION");
+const imNotAiSkillSha = generatedString("IM_NOT_AI_SKILL_BLOB_SHA");
+const imNotAiRulesSha = generatedString("IM_NOT_AI_QUICK_RULES_BLOB_SHA");
+const imNotAiRules = generatedString("IM_NOT_AI_QUICK_RULES");
+if (!imNotAiVersion || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(imNotAiVersion)) {
+  console.error("im-not-ai 동기화 버전이 비어 있거나 올바르지 않습니다.");
+  process.exit(1);
+}
+for (const [label, sha] of [["SKILL", imNotAiSkillSha], ["quick-rules", imNotAiRulesSha]]) {
+  if (!sha || !/^[0-9a-f]{40}$/.test(sha)) {
+    console.error(`im-not-ai ${label} blob SHA가 비어 있거나 올바르지 않습니다.`);
+    process.exit(1);
+  }
+}
+if (!imNotAiRules || imNotAiRules.length < 4_000) {
+  console.error("im-not-ai quick-rules 스냅샷이 비어 있거나 비정상적으로 짧습니다.");
+  process.exit(1);
+}
+
+let syncState;
+try {
+  syncState = JSON.parse(fs.readFileSync(path.join(root, "third_party/im-not-ai/sync-state.json"), "utf8"));
+} catch {
+  console.error("im-not-ai sync-state.json을 읽지 못했습니다.");
+  process.exit(1);
+}
+if (
+  syncState?.repository !== "epoko77-ai/im-not-ai"
+  || syncState?.ref !== "main"
+  || syncState?.current?.version !== imNotAiVersion
+  || syncState?.current?.skillBlobSha !== imNotAiSkillSha
+  || syncState?.current?.quickRulesBlobSha !== imNotAiRulesSha
+) {
+  console.error("im-not-ai sync-state.json과 생성 스냅샷의 현재 버전/SHA가 일치하지 않습니다.");
+  process.exit(1);
+}
+
+const syncScript = fs.readFileSync(path.join(root, "scripts/sync-im-not-ai.mjs"), "utf8");
+for (const marker of [
+  "MAX_QUICK_RULES_BYTES",
+  "MAX_RELATIVE_LENGTH_CHANGE",
+  "REQUIRED_QUICK_RULE_MARKERS",
+  "SUSPICIOUS_PATTERNS",
+  "IM_NOT_AI_ALLOW_MAJOR_CHANGE",
+  "IM_NOT_AI_ALLOW_LARGE_CHANGE",
+  "sync-state.json",
+  "Refusing automatic major update",
+  "Refusing unusually large quick-rules size change",
+]) {
+  if (!syncScript.includes(marker)) {
+    console.error(`im-not-ai upstream 동기화 안전장치 누락: ${marker}`);
+    process.exit(1);
+  }
+}
+
+const syncWorkflow = fs.readFileSync(path.join(root, ".github/workflows/sync-im-not-ai.yml"), "utf8");
+for (const marker of [
+  'cron: "17 */6 * * *"',
+  "allow_major_change:",
+  "allow_large_change:",
+  "npm run validate",
+  "third_party/im-not-ai/sync-state.json",
+  'git commit -m "변경: im-not-ai 최신 규칙 동기화"',
+]) {
+  if (!syncWorkflow.includes(marker)) {
+    console.error(`im-not-ai GitHub Actions 계약 누락: ${marker}`);
+    process.exit(1);
+  }
+}
 
 const workbench = fs.readFileSync(
   path.join(root, "components/news-research-workbench.tsx"),
@@ -98,7 +217,6 @@ for (const marker of [
     process.exit(1);
   }
 }
-
 
 if (workbench.includes("copyResearchPackage(result, true)")) {
   console.error("수집 완료 후 자동 클립보드 복사 호출이 남아 있습니다.");
@@ -145,4 +263,4 @@ if (!naverApi.includes("ac.search.naver.com/nx/ac")) {
   process.exit(1);
 }
 
-console.log("news-content-research-web 구조 검증 완료");
+console.log("news-content-research-web 구조 및 im-not-ai 후처리 계약 검증 완료");
