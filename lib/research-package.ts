@@ -1,4 +1,5 @@
 import { BLOG_CATEGORIES, getBlogCategory } from "@/lib/categories";
+import { buildImNotAiFinalizationPrompt } from "@/lib/im-not-ai";
 import type {
   CategorySelection,
   NewsOpportunity,
@@ -395,9 +396,12 @@ export function buildNewsResearchPackage(input: {
   const opportunities = opportunityIds
     ? feed.opportunities.filter((item) => opportunityIds.has(item.id))
     : feed.opportunities;
+  const imNotAiFinalizationPrompt = buildImNotAiFinalizationPrompt();
 
   return [
     input.prompt.trim() || DEFAULT_NEWS_RESEARCH_PROMPT,
+    "",
+    imNotAiFinalizationPrompt,
     "",
     "---",
     "",
