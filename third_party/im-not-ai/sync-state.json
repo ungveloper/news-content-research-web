@@ -4,11 +4,11 @@
   "current": {
     "version": "2.3.2",
     "skillBlobSha": "f0c5f318b323515816b0002ffd00d6e5901ccb54",
-    "quickRulesBlobSha": "8d83144287cf3c521367cf1f83068f4c5d810660"
+    "quickRulesBlobSha": "4fd3f6872720aefc151fe1294ebfad176b1abe94"
   },
   "previous": {
     "version": "2.3.2",
-    "skillBlobSha": "02aacfaa845597a3b9018394ab37cb5e07da1774",
-    "quickRulesBlobSha": "0d0dc7a451cf91b48bd30928cef213ff4f177504"
+    "skillBlobSha": "f0c5f318b323515816b0002ffd00d6e5901ccb54",
+    "quickRulesBlobSha": "8d83144287cf3c521367cf1f83068f4c5d810660"
   }
 }
