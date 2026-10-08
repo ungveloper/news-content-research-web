@@ -12,7 +12,6 @@ import type {
   NewsResearchErrorResponse,
   NewsResearchResponse,
 } from "@/lib/types";
-import { formatCompetitionRisk } from "../lib/competition-risk";
 
 const PROMPT_STORAGE_KEY = "news-content-research:prompt";
 const PROMPT_STORAGE_VERSION_KEY = "news-content-research:prompt-version";
@@ -434,7 +433,7 @@ export default function NewsResearchWorkbench() {
                       {group.temporary ? "임시 확장 추천" : "기본 카테고리"}
                     </span>
                     <strong>{group.label}</strong>
-                    <small>후보 {group.opportunityIds.length}{" · 예상 경쟁 위험: "}{formatCompetitionRisk(group)}개 · {group.description}</small>
+                    <small>후보 {group.opportunityIds.length}개 · {group.description}</small>
                     <b>
                       {copyingPackage && copyingGroupId === group.id ? (
                         <>
@@ -510,7 +509,7 @@ export default function NewsResearchWorkbench() {
                       <div>
                         <span>예상 경쟁 위험</span>
                         <strong>{item.competition.riskScore}/100</strong>
-                        <small>블로그 결과 {item.competition.blogResultTotal?.toLocaleString("ko-KR") ?? "-"}건</small>
+                        <small>{item.competition.riskLevel} · 블로그 결과 {item.competition.blogResultTotal?.toLocaleString("ko-KR") ?? "-"}건</small>
                       </div>
                       <div className="search-opportunity-signal">
                         <span>검색 기회 점수</span>
@@ -636,3 +635,5 @@ export default function NewsResearchWorkbench() {
     </main>
   );
 }
+
+// 예상 경쟁 위험 카드 표시 계약: 큰 값 riskScore/100 → 보조 riskLevel

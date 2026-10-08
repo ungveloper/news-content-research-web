@@ -1,3 +1,4 @@
+import "./verify-output-package-quality-v3-20261008.mjs";
 import "./verify-publish-default.mjs";
 import "./verify-score-triad.mjs";
 import "./verify-source-title-links.mjs";
