@@ -1,3 +1,5 @@
+import "./verify-publish-default.mjs";
+import "./verify-score-triad.mjs";
 import "./verify-source-title-links.mjs";
 import fs from "node:fs";
 import path from "node:path";
