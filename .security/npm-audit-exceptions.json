@@ -5,16 +5,17 @@
       "id": "brace-expansion-eslint9-dev-only",
       "advisories": [
         "GHSA-mh99-v99m-4gvg",
-        "GHSA-7r86-64r9-qc3w"
+        "GHSA-7r86-64r9-qc3w",
+        "GHSA-VFJ7-8CJW-P6XM"
       ],
       "rootPackage": "brace-expansion",
       "scope": "dev-only",
       "expiresOn": "2026-11-15",
       "requiredInstalledFloors": {
-        "1": "1.1.18",
-        "5": "5.0.9"
+        "1": "1.1.21",
+        "5": "5.0.12"
       },
-      "rationale": "ESLint 9/minimatch 3 requires the brace-expansion 1.x CommonJS API. Forcing brace-expansion 5.x breaks that API, while ESLint 10 remains blocked by eslint-plugin-react/eslint-plugin-jsx-a11y peer ranges in the current Next.js lint stack. Only this dev-only advisory chain is tolerated, and only when every installed brace-expansion copy is on the line-compatible patched floor checked by scripts/audit-security.mjs."
+      "rationale": "ESLint 9/minimatch 3 requires the brace-expansion 1.x CommonJS API, so the 1.x and 5.x brace-expansion lines are kept line-compatible but advanced to their current patched floors (1.1.21 and 5.0.12). The remaining GHSA-VFJ7-8CJW-P6XM advisory is in braces <=3.0.3, currently has no patched npm release, and is tolerated only when npm audit reports the entire chain as dev-only. scripts/audit-security.mjs fails closed for production/runtime paths, critical findings, unknown advisories, expired exceptions, or brace-expansion floors below policy."
     }
   ]
 }
