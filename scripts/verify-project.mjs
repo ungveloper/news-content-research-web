@@ -1,3 +1,4 @@
+import "./verify-source-title-links.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
