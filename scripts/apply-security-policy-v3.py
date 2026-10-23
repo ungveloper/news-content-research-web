@@ -18,10 +18,10 @@ def set_direct_if_present(name: str, version: str) -> bool:
             found = True
     return found
 
-if not set_direct_if_present("next", "16.4.0"):
+if not set_direct_if_present("next", "16.4.2"):
     raise SystemExit("ERROR: direct dependency next를 찾지 못했습니다.")
 
-if not set_direct_if_present("eslint-config-next", "16.4.0"):
+if not set_direct_if_present("eslint-config-next", "16.4.2"):
     raise SystemExit("ERROR: devDependency eslint-config-next를 찾지 못했습니다.")
 
 # Runtime/transitive floors that are already patchable.
@@ -79,7 +79,7 @@ policy_path.write_text(
 )
 
 print("  package.json + npm audit 정책 업데이트 완료")
-print("   - next / eslint-config-next: 16.4.0")
+print("   - next / eslint-config-next: 16.4.2")
 print("   - sharp override: 0.35.5")
 print("   - source-map-js override: 1.2.2")
 print("   - brace-expansion floor: 1.x >=1.1.21 / 5.x >=5.0.12")

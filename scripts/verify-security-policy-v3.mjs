@@ -32,8 +32,8 @@ const next = lock.packages?.["node_modules/next"]?.version;
 const eslintNext = lock.packages?.["node_modules/eslint-config-next"]?.version;
 const sharp = lock.packages?.["node_modules/sharp"]?.version;
 
-if (next !== "16.4.0") fail(`next=${next ?? "(missing)"}`);
-if (eslintNext !== "16.4.0") fail(`eslint-config-next=${eslintNext ?? "(missing)"}`);
+if (next !== "16.4.2") fail(`next=${next ?? "(missing)"}`);
+if (eslintNext !== "16.4.2") fail(`eslint-config-next=${eslintNext ?? "(missing)"}`);
 if (!atLeast(sharp, "0.35.5")) fail(`sharp=${sharp ?? "(missing)"} < 0.35.5`);
 
 const sourceMapCopies = Object.entries(lock.packages ?? {})

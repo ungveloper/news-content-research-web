@@ -259,8 +259,8 @@ const installedNextPostcss =
   packageLock.packages?.["node_modules/next/node_modules/postcss"]?.version
   ?? packageLock.packages?.["node_modules/postcss"]?.version;
 
-if (!versionAtLeast(installedNext, "16.3.5")) {
-  console.error(`Next.js 보안 패치 버전 미달: ${installedNext ?? "없음"} (최소 16.3.5)`);
+if (!versionAtLeast(installedNext, "16.4.1")) {
+  console.error(`Next.js 보안 패치 버전 미달: ${installedNext ?? "없음"} (최소 16.4.1)`);
   process.exit(1);
 }
 if (installedEslintNext !== installedNext) {
