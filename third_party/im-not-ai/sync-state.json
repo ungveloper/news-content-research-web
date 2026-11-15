@@ -2,13 +2,13 @@
   "repository": "epoko77-ai/im-not-ai",
   "ref": "main",
   "current": {
-    "version": "2.3.2",
-    "skillBlobSha": "e29d61deeada85bc15321664639d2568a5325c86",
+    "version": "2.4.4",
+    "skillBlobSha": "47e4e361d8ead8dcb90bd9c62061bfa5c07ca594",
     "quickRulesBlobSha": "49a2d186f8eb7b4c08fec8c907a26bdd2a847a7b"
   },
   "previous": {
     "version": "2.3.2",
-    "skillBlobSha": "f0c5f318b323515816b0002ffd00d6e5901ccb54",
-    "quickRulesBlobSha": "4fd3f6872720aefc151fe1294ebfad176b1abe94"
+    "skillBlobSha": "e29d61deeada85bc15321664639d2568a5325c86",
+    "quickRulesBlobSha": "49a2d186f8eb7b4c08fec8c907a26bdd2a847a7b"
   }
 }
