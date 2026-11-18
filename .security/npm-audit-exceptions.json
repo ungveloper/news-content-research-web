@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "reviewedOn": "2026-11-18",
   "exceptions": [
     {
       "id": "brace-expansion-eslint9-dev-only",
@@ -10,12 +11,23 @@
       ],
       "rootPackage": "brace-expansion",
       "scope": "dev-only",
-      "expiresOn": "2026-11-15",
+      "expiresOn": "2026-12-18",
       "requiredInstalledFloors": {
         "1": "1.1.21",
         "5": "5.0.12"
       },
-      "rationale": "ESLint 9/minimatch 3 requires the brace-expansion 1.x CommonJS API, so the 1.x and 5.x brace-expansion lines are kept line-compatible but advanced to their current patched floors (1.1.21 and 5.0.12). The remaining GHSA-VFJ7-8CJW-P6XM advisory is in braces <=3.0.3, currently has no patched npm release, and is tolerated only when npm audit reports the entire chain as dev-only. scripts/audit-security.mjs fails closed for production/runtime paths, critical findings, unknown advisories, expired exceptions, or brace-expansion floors below policy."
+      "rationale": "2026-11-18 재검토: ESLint 계열의 dev-only brace-expansion은 1.x/5.x 호환 패치 버전으로 유지한다. braces 관련 GHSA-VFJ7-8CJW-P6XM은 게시 상태가 변할 수 있으므로 기한부로만 추적한다. 운영 경로, critical, 미등록 advisory, 취약한 brace-expansion 설치 버전은 예외 불가."
+    },
+    {
+      "id": "glob-toolchain-dev-only-20261118",
+      "advisories": [
+        "GHSA-FC5Q-39XC-VJPF",
+        "GHSA-G3HV-75WG-M249"
+      ],
+      "rootPackages": ["picomatch", "minimatch"],
+      "scope": "dev-only",
+      "expiresOn": "2026-12-18",
+      "rationale": "2026-11-18 재검토: picomatch GHSA-FC5Q-39XC-VJPF는 수정된 npm 배포 버전이 아직 없으며, minimatch GHSA-G3HV-75WG-M249는 11.0.1에서 해결됐으나 현재 ESLint 도구의 선언 범위를 넘어서는 major 강제 override는 호환성 위험이 있다. npm audit에서 전체 취약점 전파 경로가 dev-only인 경우에 한해 두 advisory만 30일간 추적한다. 새로운 advisory, critical, production/runtime 경로, 만료된 예외는 여전히 CI 실패 처리한다."
     }
   ]
 }

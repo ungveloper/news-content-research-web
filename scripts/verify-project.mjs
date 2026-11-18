@@ -323,9 +323,23 @@ if (
   !bracePolicy
   || bracePolicy.scope !== "dev-only"
   || !bracePolicy.advisories?.includes("GHSA-mh99-v99m-4gvg")
-  || bracePolicy.expiresOn !== "2026-11-15"
+  || bracePolicy.expiresOn !== "2026-12-18"
 ) {
   console.error("brace-expansion dev-only audit 예외 정책이 누락되거나 예상과 다릅니다.");
+  process.exit(1);
+}
+
+const globPolicy = auditPolicy.exceptions?.find(
+  (entry) => entry.id === "glob-toolchain-dev-only-20261118",
+);
+if (
+  !globPolicy
+  || globPolicy.scope !== "dev-only"
+  || globPolicy.expiresOn !== "2026-12-18"
+  || !globPolicy.advisories?.includes("GHSA-FC5Q-39XC-VJPF")
+  || !globPolicy.advisories?.includes("GHSA-G3HV-75WG-M249")
+) {
+  console.error("glob toolchain dev-only audit 예외 정책이 누락되거나 예상과 다릅니다.");
   process.exit(1);
 }
 
